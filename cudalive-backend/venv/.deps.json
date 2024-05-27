@@ -1,0 +1,27 @@
+- name: CreateVenv
+  description: Function to create a Python virtual environment
+  symbols:
+    venv/venv.go: Defines the CreateVenv function
+    venv/venv_test.go: Tests the CreateVenv function
+- name: InstallPackage
+  description: Function to install a package into the Python virtual environment
+  symbols:
+    venv/venv.go: Defines the InstallPackage function
+    venv/venv_test.go: Tests the InstallPackage function
+- name: go.mod
+  description: Go module dependencies
+  symbols:
+    venv/venv.go: Imports necessary packages defined in go.mod
+    venv/venv_test.go: Imports necessary packages defined in go.mod
+- name: Makefile
+  description: Build and test commands
+  symbols:
+    venv/venv.go: Referenced in build and test commands
+    venv/venv_test.go: Referenced in build and test commands
+- name: Dockerfile
+  description: Docker configuration for the Go application
+  symbols:
+    Makefile: Included in the Docker build context
+    go.mod: Included in the Docker build context
+    venv/venv.go: Included in the Docker build context
+    venv/venv_test.go: Included in the Docker build context

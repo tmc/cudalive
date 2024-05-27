@@ -1,0 +1,42 @@
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+
+  # Maintain dependencies for Python
+  - package-ecosystem: "pip-compile"
+    directory: "/fastapi-backend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 3
+
+  # Maintain dependencies for Python
+  - package-ecosystem: "pip-compile"
+    directory: "/graphene-backend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 3
+    
+  # Maintain dependencies for JavaScript
+  - package-ecosystem: "npm"
+    directory: "/react-frontend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 3
+
+  # Maintain dependencies for Go
+  - package-ecosystem: "gomod"
+    directory: "/go-graphql-backend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 3
+
+  # Maintain dependencies for the harness dir
+  - package-ecosystem: "docker"
+    directory: "/dev-harness"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 3

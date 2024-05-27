@@ -1,0 +1,3 @@
+graph/generated.go linguist-generated=true
+graph/model/** linguist-generated=true
+graph/federation.go linguist-generated=true

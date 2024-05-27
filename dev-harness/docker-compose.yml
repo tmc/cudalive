@@ -1,0 +1,124 @@
+version: '3'
+
+services:
+
+  # Use `yarn start` in the react-frontend directory to start the frontend.
+  # frontend:
+  #   build:
+  #     context: ../react-frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - gateway
+
+  gateway:
+    build:
+      context: ../gateway
+    restart: always
+    command:
+      - --dev
+      - --config
+      - config.yaml
+      - --supergraph
+      - supergraph.graphql
+        # - --log # uncomment these to do gateway debugging
+        # - debug
+    ports:
+      - "4000:4000"
+
+  backend-a:
+    build:
+      context: ../graphene-backend
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file: .env
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      OTEL_EXPORTER_OTLP_INSECURE: "true"
+    depends_on:
+      - database
+
+  backend-b:
+    build:
+      context: ../go-graphql-backend
+    restart: always
+    ports:
+      - "8080:8080"
+    env_file: .env
+    environment:
+      OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+    depends_on:
+      - database
+
+  database:
+    image: postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    env_file: .env
+    environment:
+      POSTGRES_USER: dbuser
+      POSTGRES_PASSWORD: dbpssword
+      POSTGRES_DB: db
+    volumes:
+      - database-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis/redis-stack
+    restart: always
+    ports:
+      - "6379:6379"
+      - "6380:8001" # RedisInsight port
+    volumes:
+      - redis-data:/data
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.46
+    restart: always
+    ports:
+      - "16686:16686"
+      - "14250:14250"
+      - "14269:14269"
+    env_file: .env
+    environment:
+      - METRICS_STORAGE_TYPE=prometheus
+      - PROMETHEUS_SERVER_URL=http://prometheus:9090
+      - PROMETHEUS_QUERY_SUPPORT_SPANMETRICS_CONNECTOR=true
+      - PROMETHEUS_QUERY_NAMESPACE=span_metrics
+
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/usr/share/prometheus/console_libraries
+      - --web.console.templates=/usr/share/prometheus/consoles"
+      - --web.enable-remote-write-receiver
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib
+    restart: always
+    command:
+      - --config=/etc/otel-collector-config.yaml
+      - ${OTELCOL_ARGS:-}
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "1888:1888"   # pprof extension
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP HTTP receiver
+      - "55679:55679" # zpages extension
+    depends_on:
+      - jaeger
+
+volumes:
+  database-data:
+  redis-data:

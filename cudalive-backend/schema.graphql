@@ -1,0 +1,73 @@
+# CUDAlive is a tool that live-renders triton code from pytorch code.
+
+# Define the CodeSnippet type
+type CodeSnippet {
+  id: ID!
+  content: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+# Define the CompilationResult type
+type CompilationResult {
+  id: ID!
+  codeSnippetId: ID!
+  output: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+# Define the Error type
+type Error {
+  message: String!
+  lineNumber: Int
+  columnNumber: Int
+}
+
+# Define the Explanation type
+type Explanation {
+  id: ID!
+  codeSnippetId: ID!
+  explanation: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+# Define the Query type for fetching initial data
+type Query {
+  getCodeSnippet(id: ID!): CodeSnippet
+  getAllCodeSnippets: [CodeSnippet!]!
+  getCompilationResult(id: ID!): CompilationResult
+  getExplanation(id: ID!): Explanation
+}
+
+# Define the Mutation type for updating code snippets and generating explanations
+type Mutation {
+  createCodeSnippet(content: String!): CodeSnippet!
+  updateCodeSnippet(id: ID!, content: String!): CodeSnippet!
+  deleteCodeSnippet(id: ID!): Boolean!
+  generateExplanation(codeSnippetId: ID!): Explanation!
+}
+
+# Define the Subscription type for real-time updates
+type Subscription {
+  codeSnippetUpdated(id: ID!): CodeSnippet!
+  compilationResultUpdated(codeSnippetId: ID!): CompilationResult!
+  errorOccurred(codeSnippetId: ID!): Error!
+  explanationGenerated(codeSnippetId: ID!): Explanation!
+
+
+  genericCompletion(prompt: String!): CompletionChunk
+}
+
+# Define the schema entry point
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+type CompletionChunk {
+  text: String!
+  isLast: Boolean!
+}
