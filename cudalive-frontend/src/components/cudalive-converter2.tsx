@@ -20,11 +20,16 @@ To read more about using these font, please visit the Next.js documentation:
 import { MenubarTrigger, MenubarItem, MenubarSeparator, MenubarContent, MenubarMenu, Menubar } from "@/components/ui/menubar"
 import { Textarea } from "@/components/ui/textarea"
 import { ModeToggle } from "@/components/mode-toggle"
+import { Button } from "@/components/ui/button"
+import { useTheme } from "@/components/theme-provider"
+
+import Editor from '@monaco-editor/react';
 
 export function CUDALiveConverter2() {
+  const theme = useTheme().resolvedTheme === "dark" ? "vs-dark" : "vs-light"
   return (
     <>
-      <Menubar>
+      <Menubar className="w-full">
         <MenubarMenu>
           <h1 className="text-lg font-medium p-4">CUDA Live Converter</h1>
           <MenubarTrigger>File</MenubarTrigger>
@@ -67,22 +72,84 @@ export function CUDALiveConverter2() {
           </MenubarContent>
         </MenubarMenu>
       </Menubar>
-      <div className="flex h-screen">
+
+      <div className="flex h-screen w-full">
         <div className="w-1/2 border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col">
           <div className="text-lg font-medium mb-4">Python Code</div>
-          <Textarea
-            className="flex-1 bg-gray-100 dark:bg-gray-950 rounded-md p-4 text-sm font-mono"
-            placeholder="Enter your Python code here..."
+          <Editor
+            height="90vh" defaultLanguage="python" defaultValue={`import torch
+import math
+
+def pytorch_function(DW, e, g):
+    """
+    f = 1/2 * e * (1 + erf(1/sqrt(2) * e))
+    h = f * up
+
+    df/de (with help of Wolfram :)
+    df/de = 1/2 * (1 + erf(1/sqrt(2) * e)) + 1/sqrt(2*pi) * e * exp(-1/2 * e^2)
+
+    Reuse via
+    f =        1/2 * (1 + erf(1/sqrt(2) * e)) * e
+    """
+    # Ensure input tensors are of the same shape
+    assert DW.shape == e.shape == g.shape
+
+    # Break e away for re-use
+    # f = 1/2 * e * (1 + erf(1/sqrt(2) * e))
+    f_partial = 0.5 * (torch.erf(e / math.sqrt(2.0)) + 1.0)
+    f = f_partial * e
+
+    # h = f * g
+    h = f * g
+    # df = DW * f
+    df = DW * f
+    # dg = DW * g
+    dg = DW * g
+
+    return df, dg, h`}
+            theme={theme}
           />
         </div>
         <div className="w-1/2 p-6 flex flex-col">
           <div className="text-lg font-medium mb-4">Triton Code Output</div>
-          <div className="flex-1 bg-gray-100 dark:bg-gray-950 rounded-md p-4 text-sm font-mono overflow-auto">
-            <pre>
-              import triton # Your Python code goes here x = torch.randn(1, 3, 224, 224) model =
-              triton.load_model('path/to/model.pt') y = model(x) print(y)
-            </pre>
-          </div>
+          <Editor
+            height="90vh" defaultLanguage="python" defaultValue={`import triton
+@triton.jit
+def triton_(DW, e, g, n_elements, BLOCK_SIZE : tl.constexpr,):
+    """
+    f = 1/2 * e * (1 + erf(1/sqrt(2) * e))
+    h = f * up
+
+    df/de (with help of Wolfram :)
+    df/de = 1/2 * (1 + erf(1/sqrt(2) * e)) + 1/sqrt(2*pi) * e * exp(-1/2 * e^2)
+
+    Reuse via
+    f =        1/2 * (1 + erf(1/sqrt(2) * e)) * e
+    """
+    block_idx = tl.program_id(0)
+    offsets = block_idx*BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
+    mask = offsets < n_elements
+
+    DW_row = tl.load(DW + offsets, mask = mask, other = 0)#.to(tl.float32)
+    e_row  = tl.load(e  + offsets, mask = mask, other = 0).to(tl.float32)
+    g_row  = tl.load(g  + offsets, mask = mask, other = 0)#.to(tl.float32)
+
+    # Break e_row away for re-use
+    # f = 1/2 * e * (1 + erf(1/sqrt(2) * e))
+    f_partial_row = 0.5 * (tl.math.erf(tl.math.rsqrt(2.0) * e_row) + 1.0)
+    f_row = f_partial_row * e_row
+
+    f_row = f_row.to(DW_row.dtype)
+    # h = f * g
+    h_row  =  f_row * g_row
+    # df = DW * f
+    df_row = DW_row * f_row
+    # dg = DW * g
+    dg_row = DW_row * g_row
+    return df_row, dg_row, h_row
+            `}
+            theme={theme}
+          />
         </div>
       </div>
     </>
