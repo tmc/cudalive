@@ -9,7 +9,6 @@ import './index.css'
 import { client } from './net/gqlClient';
 
 
-
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ApolloProvider client={client}>
