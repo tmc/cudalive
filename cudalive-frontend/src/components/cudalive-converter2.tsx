@@ -74,7 +74,7 @@ export function CUDALiveConverter2() {
 
       <div className="flex h-screen w-full">
         <div className="w-1/2 border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col">
-          <div className="text-lg font-medium mb-4">Python Code <Badge>PyTorch</Badge><Badge>Python 3.11</Badge></div>
+          <div className="text-lg font-medium mb-4">Python Code <Badge>Python 3.11</Badge></div>
           <Editor
             height="90vh" defaultLanguage="python" defaultValue={`import torch
 import math
@@ -110,7 +110,7 @@ def pytorch_function(DW, e, g):
           />
         </div>
         <div className="w-1/2 p-6 flex flex-col">
-          <div className="text-lg font-medium mb-4">Triton Code Output</div>
+          <div className="text-lg font-medium mb-4">Triton Code Output <Badge>PyTorch 2.3</Badge></div>
           <Editor
             height="90vh" defaultLanguage="python" defaultValue={`import triton
 @triton.jit
