@@ -18,9 +18,8 @@ To read more about using these font, please visit the Next.js documentation:
 - Pages Directory: https://nextjs.org/docs/pages/building-your-application/optimizing/fonts
 **/
 import { MenubarTrigger, MenubarItem, MenubarSeparator, MenubarContent, MenubarMenu, Menubar } from "@/components/ui/menubar"
-import { Textarea } from "@/components/ui/textarea"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { useTheme } from "@/components/theme-provider"
 
 import Editor from '@monaco-editor/react';
@@ -75,7 +74,7 @@ export function CUDALiveConverter2() {
 
       <div className="flex h-screen w-full">
         <div className="w-1/2 border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col">
-          <div className="text-lg font-medium mb-4">Python Code</div>
+          <div className="text-lg font-medium mb-4">Python Code <Badge>PyTorch</Badge><Badge>Python 3.11</Badge></div>
           <Editor
             height="90vh" defaultLanguage="python" defaultValue={`import torch
 import math
