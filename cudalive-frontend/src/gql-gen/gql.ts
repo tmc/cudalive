@@ -14,6 +14,8 @@ import { TypedDocumentNode as DocumentNode } from '@graphql-typed-document-node/
  */
 const documents = {
     "\n  subscription GenericSubscription($prompt: String!) {\n    genericCompletion(prompt: $prompt) {\n      text\n      isLast\n    }\n  }\n": types.GenericSubscriptionDocument,
+    "\n  subscription ConvertPythonToTriton($pythonCode: String!) {\n    convertPythonToTriton(pythonCode: $pythonCode) {\n      type\n      message\n      isError\n      isComplete\n      timestamp\n      progress\n      tritonCode\n    }\n  }\n": types.ConvertPythonToTritonDocument,
+    "\n  mutation SaveConversion($pythonCode: String!, $tritonCode: String!) {\n    saveConversion(pythonCode: $pythonCode, tritonCode: $tritonCode) {\n      id\n      pythonCode\n      tritonCode\n      timestamp\n    }\n  }\n": types.SaveConversionDocument,
 };
 
 /**
@@ -34,6 +36,14 @@ export function graphql(source: string): unknown;
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  subscription GenericSubscription($prompt: String!) {\n    genericCompletion(prompt: $prompt) {\n      text\n      isLast\n    }\n  }\n"): (typeof documents)["\n  subscription GenericSubscription($prompt: String!) {\n    genericCompletion(prompt: $prompt) {\n      text\n      isLast\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  subscription ConvertPythonToTriton($pythonCode: String!) {\n    convertPythonToTriton(pythonCode: $pythonCode) {\n      type\n      message\n      isError\n      isComplete\n      timestamp\n      progress\n      tritonCode\n    }\n  }\n"): (typeof documents)["\n  subscription ConvertPythonToTriton($pythonCode: String!) {\n    convertPythonToTriton(pythonCode: $pythonCode) {\n      type\n      message\n      isError\n      isComplete\n      timestamp\n      progress\n      tritonCode\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation SaveConversion($pythonCode: String!, $tritonCode: String!) {\n    saveConversion(pythonCode: $pythonCode, tritonCode: $tritonCode) {\n      id\n      pythonCode\n      tritonCode\n      timestamp\n    }\n  }\n"): (typeof documents)["\n  mutation SaveConversion($pythonCode: String!, $tritonCode: String!) {\n    saveConversion(pythonCode: $pythonCode, tritonCode: $tritonCode) {\n      id\n      pythonCode\n      tritonCode\n      timestamp\n    }\n  }\n"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};
