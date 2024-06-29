@@ -211,7 +211,7 @@ export function CUDALiveConverter() {
     <div className="flex flex-col h-screen">
       <Menubar className="w-full">
         <MenubarMenu>
-          <h1 className="text-lg font-medium p-4">CUDA Live Converter</h1>
+          <h1 className="text-lg font-medium p-4">CUDALive Converter</h1>
           <MenubarTrigger>File</MenubarTrigger>
           <MenubarContent>
             <MenubarItem onClick={handleSaveGist}>Save to Gist</MenubarItem>
@@ -262,7 +262,7 @@ export function CUDALiveConverter() {
           />
         </div>
         <div className="w-1/2 p-6 flex flex-col">
-          <div className="text-lg font-medium mb-4">Triton Code Output <Badge>PyTorch 2.3</Badge></div>
+          <div className="text-lg font-medium mb-4">Triton Code <Badge>PyTorch 2.3</Badge></div>
           <Editor
             height="100%"
             defaultLanguage="python"
