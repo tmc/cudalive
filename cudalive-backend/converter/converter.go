@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -66,7 +67,7 @@ func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, addi
 	c.buf.Reset()
 	c.buf.Write([]byte("# Converted to triton by CUDALive\n"))
 	c.logger.Println("Starting triton conversion process")
-	c.sendUpdate(updateChan, model.UpdateTypeInitialization, "Starting triton conversion process", false, false, nil)
+	c.sendUpdate(updateChan, model.UpdateTypeInitialization, "Starting triton conversion process", false, false, Ptr(5.0))
 
 	// Create or get cached virtual environment
 	envPath, err := c.getOrCreateVirtualEnv(additionalPackages, updateChan)
@@ -75,47 +76,57 @@ func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, addi
 		return nil, fmt.Errorf("failed to set up virtual environment: %w", err)
 	}
 
-	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Creating temporary Python file", false, false, nil)
+	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Creating temporary Python file", false, false, Ptr(10.0))
 	// Create a temporary Python file with the conversion code
 	tmpfile, err := c.createTempPythonFile(pythonCode)
 	if err != nil {
 		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create temporary Python file: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to create temporary Python file: %w", err)
 	}
-	c.buf.Write([]byte(fmt.Sprintf("# Python script: %s\n", tmpfile.Name())))
+	c.buf.Write([]byte(fmt.Sprint("# Processing..")))
 	// defer os.Remove(tmpfile.Name())
 
-	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Running conversion script", false, false, nil)
+	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Running conversion script", false, false, Ptr(23.0))
 	// Run the conversion script in the virtual environment
 	cmd := exec.Command(filepath.Join(envPath, "bin", "python"), tmpfile.Name())
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", envPath))
+	cmd.Env = append(os.Environ(), `TORCH_LOGS=output_code`)
 
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create stdout pipe: %v", err), true, false, nil)
-		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create stderr pipe: %v", err), true, false, nil)
-		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
+	stdoutBuf := new(bytes.Buffer)
+	stderrBuf := new(bytes.Buffer)
+	cmd.Stdout = io.MultiWriter(stdoutBuf, os.Stdout)
+	cmd.Stderr = io.MultiWriter(stderrBuf, os.Stderr)
 
 	if err := cmd.Start(); err != nil {
 		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to start conversion command: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to start conversion command: %w", err)
 	}
 
-	go c.streamOutput(stdout, updateChan, false)
-	go c.streamOutput(stderr, updateChan, true)
+	// go c.streamOutput(stdout, updateChan, false)
+	// go c.streamOutput(stderr, updateChan, true)
 
 	if err := cmd.Wait(); err != nil {
 		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Conversion failed: %v", err), true, false, nil)
 		return nil, fmt.Errorf("conversion failed: %w", err)
 	}
 
-	c.sendUpdate(updateChan, model.UpdateTypeCompletion, "Conversion completed successfully", false, true, nil)
+	outputPathRe := regexp.MustCompile(`Output code written to: (.*)`)
+	outputPath := ""
+	// scan output for the regexp (across newlines):
+	matches := outputPathRe.FindStringSubmatch(stderrBuf.String())
+	if len(matches) > 1 {
+		outputPath = matches[1]
+	}
+	if outputPath == "" {
+		return nil, fmt.Errorf("failed to extract output path from logs")
+	}
+	outputCode, err := os.ReadFile(outputPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read output code: %w", err)
+	}
+	io.Copy(c.buf, bytes.NewReader(outputCode))
+	fmt.Println("triton:", c.buf.String())
+	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Output code generated", false, true, Ptr(100.0))
 
 	return &ConversionResult{
 		TritonCode: "Streamed to client",
@@ -139,6 +150,7 @@ func (c *Converter) sendUpdate(updateChan chan<- *model.TritonConversionResult, 
 func (c *Converter) streamOutput(reader io.Reader, updateChan chan<- *model.TritonConversionResult, isError bool) {
 	scanner := bufio.NewScanner(reader)
 	for scanner.Scan() {
+		fmt.Fprintln(os.Stderr, scanner.Text())
 		updateType := model.UpdateTypeConversionProgress
 		if isError {
 			updateType = model.UpdateTypeError
@@ -199,6 +211,7 @@ func (c *Converter) isValidCachedEnv(envPath string) bool {
 
 func (c *Converter) createVirtualEnv(envPath string) error {
 	cmd := exec.Command("python3", "-m", "venv", envPath)
+	c.logger.Println("Creating virtual environment:", envPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create virtual environment: %w\nOutput: %s", err, output)
 	}
@@ -233,65 +246,7 @@ func (c *Converter) installPackages(envPath string, additionalPackages []string,
 }
 
 func (c *Converter) createTempPythonFile(pythonCode string) (*os.File, error) {
-	converterCode := `
-import torch
-import torch._dynamo as dynamo
-import logging
-from io import StringIO
-import sys
-
-def convert_to_triton(python_code):
-    # Set up logging to capture output code
-    log_capture_string = StringIO()
-    ch = logging.StreamHandler(log_capture_string)
-    ch.setLevel(logging.DEBUG)
-    logging.getLogger().addHandler(ch)
-
-    # Enable output_code artifact
-    torch._logging.set_logs(output_code=True)
-
-    # Create a simple function from the Python code
-    def func_to_convert():
-        exec(python_code)
-
-    # Use torch.compile to trigger TorchInductor
-    optimized_func = torch.compile(func_to_convert)
-
-    # Run the function to trigger compilation and logging
-    optimized_func()
-
-    # Get the captured log output
-    log_contents = log_capture_string.getvalue()
-
-    # Clean up logging
-    logging.getLogger().removeHandler(ch)
-
-    # Extract Triton code from the log output
-    triton_code = extract_triton_code(log_contents)
-
-    return triton_code
-
-def extract_triton_code(log_output):
-    triton_code = []
-    capture = False
-    for line in log_output.split('\n'):
-        if line.strip().startswith('def triton_'):
-            capture = True
-        if capture:
-            triton_code.append(line)
-        if line.strip() == '':
-            capture = False
-    return '\n'.join(triton_code)
-
-# Your Python code goes here
-python_code = """
-%s
-"""
-
-triton_code = convert_to_triton(python_code)
-print(triton_code)
-`
-	converterCode = fmt.Sprintf(converterCode, pythonCode)
+	converterCode := pythonCode
 
 	tmpfile, err := os.CreateTemp("", "converter_*.py")
 	if err != nil {

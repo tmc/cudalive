@@ -74,6 +74,7 @@ func (r *subscriptionResolver) convertPythonToTriton(ctx context.Context, input 
 
 		// Perform the actual conversion
 		tritonCode, err := conv.ConvertPythonToTriton(input.PythonVersion, input.PythonCode, input.PythonPackages, ch)
+		fmt.Println("Conversion complete!", tritonCode, err)
 		if err != nil {
 			ch <- &model.TritonConversionResult{
 				Timestamp:  time.Now().Format(time.RFC3339),
@@ -82,6 +83,7 @@ func (r *subscriptionResolver) convertPythonToTriton(ctx context.Context, input 
 			}
 			return
 		}
+		fmt.Println("Conversion complete!", tritonCode)
 
 		// Split the Triton code into chunks for progressive updates
 		chunks := strings.Split(tritonCode.TritonCode, "\n")
