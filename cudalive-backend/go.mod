@@ -1,4 +1,4 @@
-module github.com/tmc/cudalive
+module github.com/tmc/cudalive/cudalive-backend
 
 go 1.20
 
@@ -8,7 +8,6 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/ravilushqa/otelgqlgen v0.13.1
 	github.com/rs/cors v1.9.0
-	github.com/tmc/langchaingo v0.0.0-20230610024316-06cb7b57ea80
 	github.com/vektah/gqlparser/v2 v2.5.12
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.42.0
 	go.opentelemetry.io/otel v1.16.0

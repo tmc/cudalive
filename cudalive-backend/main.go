@@ -17,7 +17,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/ravilushqa/otelgqlgen"
 	"github.com/rs/cors"
-	"github.com/tmc/cudalive/graph"
+	"github.com/tmc/cudalive/cudalive-backend/graph"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 

@@ -1,7 +1,7 @@
 import { ThemeProvider } from "@/components/theme-provider"
 import { ErrorBoundary } from "react-error-boundary";
 
-import { CUDALiveConverter2 as CUDALiveConverter } from "@/components/cudalive-converter2";
+import { CUDALiveConverter } from "@/components/cudalive-converter";
 import './App.css'
 
 function App() {

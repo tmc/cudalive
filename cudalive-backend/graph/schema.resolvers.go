@@ -8,11 +8,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/tmc/cudalive/graph/model"
+	"github.com/tmc/cudalive/cudalive-backend/graph/model"
 )
 
 // CreateCodeSnippet is the resolver for the createCodeSnippet field.
-func (r *mutationResolver) CreateCodeSnippet(ctx context.Context, content string) (*model.CodeSnippet, error) {
+func (r *mutationResolver) CreateCodeSnippet(ctx context.Context, content string, language model.Language) (*model.CodeSnippet, error) {
 	panic(fmt.Errorf("not implemented: CreateCodeSnippet - createCodeSnippet"))
 }
 
@@ -26,9 +26,14 @@ func (r *mutationResolver) DeleteCodeSnippet(ctx context.Context, id string) (bo
 	panic(fmt.Errorf("not implemented: DeleteCodeSnippet - deleteCodeSnippet"))
 }
 
-// GenerateExplanation is the resolver for the generateExplanation field.
-func (r *mutationResolver) GenerateExplanation(ctx context.Context, codeSnippetID string) (*model.Explanation, error) {
-	panic(fmt.Errorf("not implemented: GenerateExplanation - generateExplanation"))
+// CompileCodeSnippet is the resolver for the compileCodeSnippet field.
+func (r *mutationResolver) CompileCodeSnippet(ctx context.Context, id string) (*model.CompilationResult, error) {
+	panic(fmt.Errorf("not implemented: CompileCodeSnippet - compileCodeSnippet"))
+}
+
+// SaveConversion is the resolver for the saveConversion field.
+func (r *mutationResolver) SaveConversion(ctx context.Context, pythonCode string, tritonCode string) (*model.ConversionHistory, error) {
+	panic(fmt.Errorf("not implemented: SaveConversion - saveConversion"))
 }
 
 // GetCodeSnippet is the resolver for the getCodeSnippet field.
@@ -46,29 +51,24 @@ func (r *queryResolver) GetCompilationResult(ctx context.Context, id string) (*m
 	panic(fmt.Errorf("not implemented: GetCompilationResult - getCompilationResult"))
 }
 
-// GetExplanation is the resolver for the getExplanation field.
-func (r *queryResolver) GetExplanation(ctx context.Context, id string) (*model.Explanation, error) {
-	panic(fmt.Errorf("not implemented: GetExplanation - getExplanation"))
+// GetConversionHistory is the resolver for the getConversionHistory field.
+func (r *queryResolver) GetConversionHistory(ctx context.Context) ([]*model.ConversionHistory, error) {
+	panic(fmt.Errorf("not implemented: GetConversionHistory - getConversionHistory"))
 }
 
 // CodeSnippetUpdated is the resolver for the codeSnippetUpdated field.
 func (r *subscriptionResolver) CodeSnippetUpdated(ctx context.Context, id string) (<-chan *model.CodeSnippet, error) {
-	panic(fmt.Errorf("not implemented: CodeSnippetUpdated - codeSnippetUpdated"))
+	return r.codeSnippetUpdated(ctx, id)
 }
 
 // CompilationResultUpdated is the resolver for the compilationResultUpdated field.
 func (r *subscriptionResolver) CompilationResultUpdated(ctx context.Context, codeSnippetID string) (<-chan *model.CompilationResult, error) {
-	panic(fmt.Errorf("not implemented: CompilationResultUpdated - compilationResultUpdated"))
+	return r.compilationResultUpdated(ctx, codeSnippetID)
 }
 
-// ErrorOccurred is the resolver for the errorOccurred field.
-func (r *subscriptionResolver) ErrorOccurred(ctx context.Context, codeSnippetID string) (<-chan *model.Error, error) {
-	panic(fmt.Errorf("not implemented: ErrorOccurred - errorOccurred"))
-}
-
-// ExplanationGenerated is the resolver for the explanationGenerated field.
-func (r *subscriptionResolver) ExplanationGenerated(ctx context.Context, codeSnippetID string) (<-chan *model.Explanation, error) {
-	panic(fmt.Errorf("not implemented: ExplanationGenerated - explanationGenerated"))
+// ConvertPythonToTriton is the resolver for the convertPythonToTriton field.
+func (r *subscriptionResolver) ConvertPythonToTriton(ctx context.Context, input model.TritonConversionRequestInput) (<-chan *model.TritonConversionResult, error) {
+	return r.convertPythonToTriton(ctx, input)
 }
 
 // GenericCompletion is the resolver for the genericCompletion field.

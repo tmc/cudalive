@@ -2,19 +2,28 @@
 
 package model
 
+import (
+	"fmt"
+	"io"
+	"strconv"
+)
+
 type CodeSnippet struct {
-	ID        string `json:"id"`
-	Content   string `json:"content"`
-	CreatedAt string `json:"createdAt"`
-	UpdatedAt string `json:"updatedAt"`
+	ID                string             `json:"id"`
+	Content           string             `json:"content"`
+	Language          Language           `json:"language"`
+	CreatedAt         string             `json:"createdAt"`
+	UpdatedAt         string             `json:"updatedAt"`
+	CompilationResult *CompilationResult `json:"compilationResult,omitempty"`
 }
 
 type CompilationResult struct {
-	ID            string `json:"id"`
-	CodeSnippetID string `json:"codeSnippetId"`
-	Output        string `json:"output"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
+	ID            string            `json:"id"`
+	CodeSnippetID string            `json:"codeSnippetId"`
+	Output        string            `json:"output"`
+	Status        CompilationStatus `json:"status"`
+	ErrorMessage  *string           `json:"errorMessage,omitempty"`
+	CreatedAt     string            `json:"createdAt"`
 }
 
 type CompletionChunk struct {
@@ -22,18 +31,11 @@ type CompletionChunk struct {
 	IsLast bool   `json:"isLast"`
 }
 
-type Error struct {
-	Message      string `json:"message"`
-	LineNumber   *int   `json:"lineNumber,omitempty"`
-	ColumnNumber *int   `json:"columnNumber,omitempty"`
-}
-
-type Explanation struct {
-	ID            string `json:"id"`
-	CodeSnippetID string `json:"codeSnippetId"`
-	Explanation   string `json:"explanation"`
-	CreatedAt     string `json:"createdAt"`
-	UpdatedAt     string `json:"updatedAt"`
+type ConversionHistory struct {
+	ID                string                   `json:"id"`
+	ConversionRequest *TritonConversionRequest `json:"conversionRequest"`
+	TritonCode        string                   `json:"tritonCode"`
+	Timestamp         string                   `json:"timestamp"`
 }
 
 type Mutation struct {
@@ -43,4 +45,159 @@ type Query struct {
 }
 
 type Subscription struct {
+}
+
+type TritonConversionRequest struct {
+	PythonVersion  string   `json:"pythonVersion"`
+	PythonPackages []string `json:"pythonPackages"`
+	PythonCode     string   `json:"pythonCode"`
+}
+
+type TritonConversionRequestInput struct {
+	PythonVersion  string   `json:"pythonVersion"`
+	PythonPackages []string `json:"pythonPackages"`
+	PythonCode     string   `json:"pythonCode"`
+}
+
+type TritonConversionResult struct {
+	Type       UpdateType `json:"type"`
+	Message    string     `json:"message"`
+	IsError    bool       `json:"isError"`
+	IsComplete bool       `json:"isComplete"`
+	Timestamp  string     `json:"timestamp"`
+	Progress   *float64   `json:"progress,omitempty"`
+	TritonCode *string    `json:"tritonCode,omitempty"`
+}
+
+type CompilationStatus string
+
+const (
+	CompilationStatusPending   CompilationStatus = "PENDING"
+	CompilationStatusCompleted CompilationStatus = "COMPLETED"
+	CompilationStatusFailed    CompilationStatus = "FAILED"
+)
+
+var AllCompilationStatus = []CompilationStatus{
+	CompilationStatusPending,
+	CompilationStatusCompleted,
+	CompilationStatusFailed,
+}
+
+func (e CompilationStatus) IsValid() bool {
+	switch e {
+	case CompilationStatusPending, CompilationStatusCompleted, CompilationStatusFailed:
+		return true
+	}
+	return false
+}
+
+func (e CompilationStatus) String() string {
+	return string(e)
+}
+
+func (e *CompilationStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = CompilationStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid CompilationStatus", str)
+	}
+	return nil
+}
+
+func (e CompilationStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type Language string
+
+const (
+	LanguagePython Language = "PYTHON"
+	LanguageTriton Language = "TRITON"
+)
+
+var AllLanguage = []Language{
+	LanguagePython,
+	LanguageTriton,
+}
+
+func (e Language) IsValid() bool {
+	switch e {
+	case LanguagePython, LanguageTriton:
+		return true
+	}
+	return false
+}
+
+func (e Language) String() string {
+	return string(e)
+}
+
+func (e *Language) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = Language(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid Language", str)
+	}
+	return nil
+}
+
+func (e Language) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type UpdateType string
+
+const (
+	UpdateTypeInitialization      UpdateType = "INITIALIZATION"
+	UpdateTypeEnvironmentSetup    UpdateType = "ENVIRONMENT_SETUP"
+	UpdateTypePackageInstallation UpdateType = "PACKAGE_INSTALLATION"
+	UpdateTypeConversionProgress  UpdateType = "CONVERSION_PROGRESS"
+	UpdateTypeCompletion          UpdateType = "COMPLETION"
+	UpdateTypeError               UpdateType = "ERROR"
+)
+
+var AllUpdateType = []UpdateType{
+	UpdateTypeInitialization,
+	UpdateTypeEnvironmentSetup,
+	UpdateTypePackageInstallation,
+	UpdateTypeConversionProgress,
+	UpdateTypeCompletion,
+	UpdateTypeError,
+}
+
+func (e UpdateType) IsValid() bool {
+	switch e {
+	case UpdateTypeInitialization, UpdateTypeEnvironmentSetup, UpdateTypePackageInstallation, UpdateTypeConversionProgress, UpdateTypeCompletion, UpdateTypeError:
+		return true
+	}
+	return false
+}
+
+func (e UpdateType) String() string {
+	return string(e)
+}
+
+func (e *UpdateType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = UpdateType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid UpdateType", str)
+	}
+	return nil
+}
+
+func (e UpdateType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }

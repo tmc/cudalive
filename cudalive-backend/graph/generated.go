@@ -15,7 +15,7 @@ import (
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/99designs/gqlgen/graphql/introspection"
 	"github.com/99designs/gqlgen/plugin/federation/fedruntime"
-	"github.com/tmc/cudalive/graph/model"
+	"github.com/tmc/cudalive/cudalive-backend/graph/model"
 	gqlparser "github.com/vektah/gqlparser/v2"
 	"github.com/vektah/gqlparser/v2/ast"
 )
@@ -50,18 +50,21 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	CodeSnippet struct {
-		Content   func(childComplexity int) int
-		CreatedAt func(childComplexity int) int
-		ID        func(childComplexity int) int
-		UpdatedAt func(childComplexity int) int
+		CompilationResult func(childComplexity int) int
+		Content           func(childComplexity int) int
+		CreatedAt         func(childComplexity int) int
+		ID                func(childComplexity int) int
+		Language          func(childComplexity int) int
+		UpdatedAt         func(childComplexity int) int
 	}
 
 	CompilationResult struct {
 		CodeSnippetID func(childComplexity int) int
 		CreatedAt     func(childComplexity int) int
+		ErrorMessage  func(childComplexity int) int
 		ID            func(childComplexity int) int
 		Output        func(childComplexity int) int
-		UpdatedAt     func(childComplexity int) int
+		Status        func(childComplexity int) int
 	}
 
 	CompletionChunk struct {
@@ -69,41 +72,50 @@ type ComplexityRoot struct {
 		Text   func(childComplexity int) int
 	}
 
-	Error struct {
-		ColumnNumber func(childComplexity int) int
-		LineNumber   func(childComplexity int) int
-		Message      func(childComplexity int) int
-	}
-
-	Explanation struct {
-		CodeSnippetID func(childComplexity int) int
-		CreatedAt     func(childComplexity int) int
-		Explanation   func(childComplexity int) int
-		ID            func(childComplexity int) int
-		UpdatedAt     func(childComplexity int) int
+	ConversionHistory struct {
+		ConversionRequest func(childComplexity int) int
+		ID                func(childComplexity int) int
+		Timestamp         func(childComplexity int) int
+		TritonCode        func(childComplexity int) int
 	}
 
 	Mutation struct {
-		CreateCodeSnippet   func(childComplexity int, content string) int
-		DeleteCodeSnippet   func(childComplexity int, id string) int
-		GenerateExplanation func(childComplexity int, codeSnippetID string) int
-		UpdateCodeSnippet   func(childComplexity int, id string, content string) int
+		CompileCodeSnippet func(childComplexity int, id string) int
+		CreateCodeSnippet  func(childComplexity int, content string, language model.Language) int
+		DeleteCodeSnippet  func(childComplexity int, id string) int
+		SaveConversion     func(childComplexity int, pythonCode string, tritonCode string) int
+		UpdateCodeSnippet  func(childComplexity int, id string, content string) int
 	}
 
 	Query struct {
 		GetAllCodeSnippets   func(childComplexity int) int
 		GetCodeSnippet       func(childComplexity int, id string) int
 		GetCompilationResult func(childComplexity int, id string) int
-		GetExplanation       func(childComplexity int, id string) int
+		GetConversionHistory func(childComplexity int) int
 		__resolve__service   func(childComplexity int) int
 	}
 
 	Subscription struct {
 		CodeSnippetUpdated       func(childComplexity int, id string) int
 		CompilationResultUpdated func(childComplexity int, codeSnippetID string) int
-		ErrorOccurred            func(childComplexity int, codeSnippetID string) int
-		ExplanationGenerated     func(childComplexity int, codeSnippetID string) int
+		ConvertPythonToTriton    func(childComplexity int, input model.TritonConversionRequestInput) int
 		GenericCompletion        func(childComplexity int, prompt string) int
+	}
+
+	TritonConversionRequest struct {
+		PythonCode     func(childComplexity int) int
+		PythonPackages func(childComplexity int) int
+		PythonVersion  func(childComplexity int) int
+	}
+
+	TritonConversionResult struct {
+		IsComplete func(childComplexity int) int
+		IsError    func(childComplexity int) int
+		Message    func(childComplexity int) int
+		Progress   func(childComplexity int) int
+		Timestamp  func(childComplexity int) int
+		TritonCode func(childComplexity int) int
+		Type       func(childComplexity int) int
 	}
 
 	_Service struct {
@@ -112,22 +124,22 @@ type ComplexityRoot struct {
 }
 
 type MutationResolver interface {
-	CreateCodeSnippet(ctx context.Context, content string) (*model.CodeSnippet, error)
+	CreateCodeSnippet(ctx context.Context, content string, language model.Language) (*model.CodeSnippet, error)
 	UpdateCodeSnippet(ctx context.Context, id string, content string) (*model.CodeSnippet, error)
 	DeleteCodeSnippet(ctx context.Context, id string) (bool, error)
-	GenerateExplanation(ctx context.Context, codeSnippetID string) (*model.Explanation, error)
+	CompileCodeSnippet(ctx context.Context, id string) (*model.CompilationResult, error)
+	SaveConversion(ctx context.Context, pythonCode string, tritonCode string) (*model.ConversionHistory, error)
 }
 type QueryResolver interface {
 	GetCodeSnippet(ctx context.Context, id string) (*model.CodeSnippet, error)
 	GetAllCodeSnippets(ctx context.Context) ([]*model.CodeSnippet, error)
 	GetCompilationResult(ctx context.Context, id string) (*model.CompilationResult, error)
-	GetExplanation(ctx context.Context, id string) (*model.Explanation, error)
+	GetConversionHistory(ctx context.Context) ([]*model.ConversionHistory, error)
 }
 type SubscriptionResolver interface {
 	CodeSnippetUpdated(ctx context.Context, id string) (<-chan *model.CodeSnippet, error)
 	CompilationResultUpdated(ctx context.Context, codeSnippetID string) (<-chan *model.CompilationResult, error)
-	ErrorOccurred(ctx context.Context, codeSnippetID string) (<-chan *model.Error, error)
-	ExplanationGenerated(ctx context.Context, codeSnippetID string) (<-chan *model.Explanation, error)
+	ConvertPythonToTriton(ctx context.Context, input model.TritonConversionRequestInput) (<-chan *model.TritonConversionResult, error)
 	GenericCompletion(ctx context.Context, prompt string) (<-chan *model.CompletionChunk, error)
 }
 
@@ -150,6 +162,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
+	case "CodeSnippet.compilationResult":
+		if e.complexity.CodeSnippet.CompilationResult == nil {
+			break
+		}
+
+		return e.complexity.CodeSnippet.CompilationResult(childComplexity), true
+
 	case "CodeSnippet.content":
 		if e.complexity.CodeSnippet.Content == nil {
 			break
@@ -170,6 +189,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.CodeSnippet.ID(childComplexity), true
+
+	case "CodeSnippet.language":
+		if e.complexity.CodeSnippet.Language == nil {
+			break
+		}
+
+		return e.complexity.CodeSnippet.Language(childComplexity), true
 
 	case "CodeSnippet.updatedAt":
 		if e.complexity.CodeSnippet.UpdatedAt == nil {
@@ -192,6 +218,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CompilationResult.CreatedAt(childComplexity), true
 
+	case "CompilationResult.errorMessage":
+		if e.complexity.CompilationResult.ErrorMessage == nil {
+			break
+		}
+
+		return e.complexity.CompilationResult.ErrorMessage(childComplexity), true
+
 	case "CompilationResult.id":
 		if e.complexity.CompilationResult.ID == nil {
 			break
@@ -206,12 +239,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CompilationResult.Output(childComplexity), true
 
-	case "CompilationResult.updatedAt":
-		if e.complexity.CompilationResult.UpdatedAt == nil {
+	case "CompilationResult.status":
+		if e.complexity.CompilationResult.Status == nil {
 			break
 		}
 
-		return e.complexity.CompilationResult.UpdatedAt(childComplexity), true
+		return e.complexity.CompilationResult.Status(childComplexity), true
 
 	case "CompletionChunk.isLast":
 		if e.complexity.CompletionChunk.IsLast == nil {
@@ -227,61 +260,45 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.CompletionChunk.Text(childComplexity), true
 
-	case "Error.columnNumber":
-		if e.complexity.Error.ColumnNumber == nil {
+	case "ConversionHistory.conversionRequest":
+		if e.complexity.ConversionHistory.ConversionRequest == nil {
 			break
 		}
 
-		return e.complexity.Error.ColumnNumber(childComplexity), true
+		return e.complexity.ConversionHistory.ConversionRequest(childComplexity), true
 
-	case "Error.lineNumber":
-		if e.complexity.Error.LineNumber == nil {
+	case "ConversionHistory.id":
+		if e.complexity.ConversionHistory.ID == nil {
 			break
 		}
 
-		return e.complexity.Error.LineNumber(childComplexity), true
+		return e.complexity.ConversionHistory.ID(childComplexity), true
 
-	case "Error.message":
-		if e.complexity.Error.Message == nil {
+	case "ConversionHistory.timestamp":
+		if e.complexity.ConversionHistory.Timestamp == nil {
 			break
 		}
 
-		return e.complexity.Error.Message(childComplexity), true
+		return e.complexity.ConversionHistory.Timestamp(childComplexity), true
 
-	case "Explanation.codeSnippetId":
-		if e.complexity.Explanation.CodeSnippetID == nil {
+	case "ConversionHistory.tritonCode":
+		if e.complexity.ConversionHistory.TritonCode == nil {
 			break
 		}
 
-		return e.complexity.Explanation.CodeSnippetID(childComplexity), true
+		return e.complexity.ConversionHistory.TritonCode(childComplexity), true
 
-	case "Explanation.createdAt":
-		if e.complexity.Explanation.CreatedAt == nil {
+	case "Mutation.compileCodeSnippet":
+		if e.complexity.Mutation.CompileCodeSnippet == nil {
 			break
 		}
 
-		return e.complexity.Explanation.CreatedAt(childComplexity), true
-
-	case "Explanation.explanation":
-		if e.complexity.Explanation.Explanation == nil {
-			break
+		args, err := ec.field_Mutation_compileCodeSnippet_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
 		}
 
-		return e.complexity.Explanation.Explanation(childComplexity), true
-
-	case "Explanation.id":
-		if e.complexity.Explanation.ID == nil {
-			break
-		}
-
-		return e.complexity.Explanation.ID(childComplexity), true
-
-	case "Explanation.updatedAt":
-		if e.complexity.Explanation.UpdatedAt == nil {
-			break
-		}
-
-		return e.complexity.Explanation.UpdatedAt(childComplexity), true
+		return e.complexity.Mutation.CompileCodeSnippet(childComplexity, args["id"].(string)), true
 
 	case "Mutation.createCodeSnippet":
 		if e.complexity.Mutation.CreateCodeSnippet == nil {
@@ -293,7 +310,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.CreateCodeSnippet(childComplexity, args["content"].(string)), true
+		return e.complexity.Mutation.CreateCodeSnippet(childComplexity, args["content"].(string), args["language"].(model.Language)), true
 
 	case "Mutation.deleteCodeSnippet":
 		if e.complexity.Mutation.DeleteCodeSnippet == nil {
@@ -307,17 +324,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Mutation.DeleteCodeSnippet(childComplexity, args["id"].(string)), true
 
-	case "Mutation.generateExplanation":
-		if e.complexity.Mutation.GenerateExplanation == nil {
+	case "Mutation.saveConversion":
+		if e.complexity.Mutation.SaveConversion == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_generateExplanation_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_saveConversion_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.GenerateExplanation(childComplexity, args["codeSnippetId"].(string)), true
+		return e.complexity.Mutation.SaveConversion(childComplexity, args["pythonCode"].(string), args["tritonCode"].(string)), true
 
 	case "Mutation.updateCodeSnippet":
 		if e.complexity.Mutation.UpdateCodeSnippet == nil {
@@ -362,17 +379,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.GetCompilationResult(childComplexity, args["id"].(string)), true
 
-	case "Query.getExplanation":
-		if e.complexity.Query.GetExplanation == nil {
+	case "Query.getConversionHistory":
+		if e.complexity.Query.GetConversionHistory == nil {
 			break
 		}
 
-		args, err := ec.field_Query_getExplanation_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.GetExplanation(childComplexity, args["id"].(string)), true
+		return e.complexity.Query.GetConversionHistory(childComplexity), true
 
 	case "Query._service":
 		if e.complexity.Query.__resolve__service == nil {
@@ -405,29 +417,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Subscription.CompilationResultUpdated(childComplexity, args["codeSnippetId"].(string)), true
 
-	case "Subscription.errorOccurred":
-		if e.complexity.Subscription.ErrorOccurred == nil {
+	case "Subscription.convertPythonToTriton":
+		if e.complexity.Subscription.ConvertPythonToTriton == nil {
 			break
 		}
 
-		args, err := ec.field_Subscription_errorOccurred_args(context.TODO(), rawArgs)
+		args, err := ec.field_Subscription_convertPythonToTriton_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Subscription.ErrorOccurred(childComplexity, args["codeSnippetId"].(string)), true
-
-	case "Subscription.explanationGenerated":
-		if e.complexity.Subscription.ExplanationGenerated == nil {
-			break
-		}
-
-		args, err := ec.field_Subscription_explanationGenerated_args(context.TODO(), rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Subscription.ExplanationGenerated(childComplexity, args["codeSnippetId"].(string)), true
+		return e.complexity.Subscription.ConvertPythonToTriton(childComplexity, args["input"].(model.TritonConversionRequestInput)), true
 
 	case "Subscription.genericCompletion":
 		if e.complexity.Subscription.GenericCompletion == nil {
@@ -440,6 +440,76 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Subscription.GenericCompletion(childComplexity, args["prompt"].(string)), true
+
+	case "TritonConversionRequest.pythonCode":
+		if e.complexity.TritonConversionRequest.PythonCode == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionRequest.PythonCode(childComplexity), true
+
+	case "TritonConversionRequest.pythonPackages":
+		if e.complexity.TritonConversionRequest.PythonPackages == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionRequest.PythonPackages(childComplexity), true
+
+	case "TritonConversionRequest.pythonVersion":
+		if e.complexity.TritonConversionRequest.PythonVersion == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionRequest.PythonVersion(childComplexity), true
+
+	case "TritonConversionResult.isComplete":
+		if e.complexity.TritonConversionResult.IsComplete == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.IsComplete(childComplexity), true
+
+	case "TritonConversionResult.isError":
+		if e.complexity.TritonConversionResult.IsError == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.IsError(childComplexity), true
+
+	case "TritonConversionResult.message":
+		if e.complexity.TritonConversionResult.Message == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.Message(childComplexity), true
+
+	case "TritonConversionResult.progress":
+		if e.complexity.TritonConversionResult.Progress == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.Progress(childComplexity), true
+
+	case "TritonConversionResult.timestamp":
+		if e.complexity.TritonConversionResult.Timestamp == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.Timestamp(childComplexity), true
+
+	case "TritonConversionResult.tritonCode":
+		if e.complexity.TritonConversionResult.TritonCode == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.TritonCode(childComplexity), true
+
+	case "TritonConversionResult.type":
+		if e.complexity.TritonConversionResult.Type == nil {
+			break
+		}
+
+		return e.complexity.TritonConversionResult.Type(childComplexity), true
 
 	case "_Service.sdl":
 		if e.complexity._Service.SDL == nil {
@@ -455,7 +525,9 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 	rc := graphql.GetOperationContext(ctx)
 	ec := executionContext{rc, e, 0, 0, make(chan graphql.DeferredResult)}
-	inputUnmarshalMap := graphql.BuildUnmarshalerMap()
+	inputUnmarshalMap := graphql.BuildUnmarshalerMap(
+		ec.unmarshalInputTritonConversionRequestInput,
+	)
 	first := true
 
 	switch rc.Operation.Operation {
@@ -569,78 +641,98 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "../schema.graphql", Input: `# CUDAlive Schema
-
-# Define the CodeSnippet type
-type CodeSnippet {
+	{Name: "../schema.graphql", Input: `type CodeSnippet {
   id: ID!
   content: String!
+  language: Language!
   createdAt: String!
   updatedAt: String!
+  compilationResult: CompilationResult
 }
 
-# Define the CompilationResult type
+enum Language {
+  PYTHON
+  TRITON
+}
+
 type CompilationResult {
   id: ID!
   codeSnippetId: ID!
   output: String!
+  status: CompilationStatus!
+  errorMessage: String
   createdAt: String!
-  updatedAt: String!
 }
 
-# Define the Error type
-type Error {
-  message: String!
-  lineNumber: Int
-  columnNumber: Int
+enum CompilationStatus {
+  PENDING
+  COMPLETED
+  FAILED
 }
 
-# Define the Explanation type
-type Explanation {
+type ConversionHistory {
   id: ID!
-  codeSnippetId: ID!
-  explanation: String!
-  createdAt: String!
-  updatedAt: String!
+  conversionRequest: TritonConversionRequest!
+  tritonCode: String!
+  timestamp: String!
 }
 
-# Define the Query type for fetching initial data
 type Query {
   getCodeSnippet(id: ID!): CodeSnippet
   getAllCodeSnippets: [CodeSnippet!]!
   getCompilationResult(id: ID!): CompilationResult
-  getExplanation(id: ID!): Explanation
+  getConversionHistory: [ConversionHistory!]!
 }
 
-# Define the Mutation type for updating code snippets and generating explanations
 type Mutation {
-  createCodeSnippet(content: String!): CodeSnippet!
+  createCodeSnippet(content: String!, language: Language!): CodeSnippet!
   updateCodeSnippet(id: ID!, content: String!): CodeSnippet!
   deleteCodeSnippet(id: ID!): Boolean!
-  generateExplanation(codeSnippetId: ID!): Explanation!
+  compileCodeSnippet(id: ID!): CompilationResult!
+  saveConversion(pythonCode: String!, tritonCode: String!): ConversionHistory!
 }
 
-# Define the Subscription type for real-time updates
 type Subscription {
   codeSnippetUpdated(id: ID!): CodeSnippet!
   compilationResultUpdated(codeSnippetId: ID!): CompilationResult!
-  errorOccurred(codeSnippetId: ID!): Error!
-  explanationGenerated(codeSnippetId: ID!): Explanation!
-
-
+  convertPythonToTriton(input: TritonConversionRequestInput!): TritonConversionResult!
   genericCompletion(prompt: String!): CompletionChunk
 }
 
-# Define the schema entry point
-schema {
-  query: Query
-  mutation: Mutation
-  subscription: Subscription
+input TritonConversionRequestInput {
+  pythonVersion: String!
+  pythonPackages: [String!]!
+  pythonCode: String!
+}
+
+type TritonConversionRequest {
+  pythonVersion: String!
+  pythonPackages: [String!]!
+  pythonCode: String!
 }
 
 type CompletionChunk {
   text: String!
   isLast: Boolean!
+}
+
+enum UpdateType {
+  INITIALIZATION
+  ENVIRONMENT_SETUP
+  PACKAGE_INSTALLATION
+  CONVERSION_PROGRESS
+  COMPLETION
+  ERROR
+}
+
+type TritonConversionResult {
+  type: UpdateType!
+  message: String!
+  isError: Boolean!
+  isComplete: Boolean!
+  timestamp: String!
+  progress: Float
+  tritonCode: String
 }
 `, BuiltIn: false},
 	{Name: "../federation/directives.graphql", Input: `
@@ -710,6 +802,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // region    ***************************** args.gotpl *****************************
 
+func (ec *executionContext) field_Mutation_compileCodeSnippet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["id"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
+		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["id"] = arg0
+	return args, nil
+}
+
 func (ec *executionContext) field_Mutation_createCodeSnippet_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -722,6 +829,15 @@ func (ec *executionContext) field_Mutation_createCodeSnippet_args(ctx context.Co
 		}
 	}
 	args["content"] = arg0
+	var arg1 model.Language
+	if tmp, ok := rawArgs["language"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("language"))
+		arg1, err = ec.unmarshalNLanguage2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐLanguage(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["language"] = arg1
 	return args, nil
 }
 
@@ -740,18 +856,27 @@ func (ec *executionContext) field_Mutation_deleteCodeSnippet_args(ctx context.Co
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_generateExplanation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_saveConversion_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
 	var arg0 string
-	if tmp, ok := rawArgs["codeSnippetId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("codeSnippetId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+	if tmp, ok := rawArgs["pythonCode"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pythonCode"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["codeSnippetId"] = arg0
+	args["pythonCode"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["tritonCode"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("tritonCode"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["tritonCode"] = arg1
 	return args, nil
 }
 
@@ -824,21 +949,6 @@ func (ec *executionContext) field_Query_getCompilationResult_args(ctx context.Co
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_getExplanation_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["id"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("id"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["id"] = arg0
-	return args, nil
-}
-
 func (ec *executionContext) field_Subscription_codeSnippetUpdated_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
@@ -869,33 +979,18 @@ func (ec *executionContext) field_Subscription_compilationResultUpdated_args(ctx
 	return args, nil
 }
 
-func (ec *executionContext) field_Subscription_errorOccurred_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Subscription_convertPythonToTriton_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["codeSnippetId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("codeSnippetId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
+	var arg0 model.TritonConversionRequestInput
+	if tmp, ok := rawArgs["input"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+		arg0, err = ec.unmarshalNTritonConversionRequestInput2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionRequestInput(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["codeSnippetId"] = arg0
-	return args, nil
-}
-
-func (ec *executionContext) field_Subscription_explanationGenerated_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
-	var err error
-	args := map[string]interface{}{}
-	var arg0 string
-	if tmp, ok := rawArgs["codeSnippetId"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("codeSnippetId"))
-		arg0, err = ec.unmarshalNID2string(ctx, tmp)
-		if err != nil {
-			return nil, err
-		}
-	}
-	args["codeSnippetId"] = arg0
+	args["input"] = arg0
 	return args, nil
 }
 
@@ -1040,6 +1135,50 @@ func (ec *executionContext) fieldContext_CodeSnippet_content(_ context.Context, 
 	return fc, nil
 }
 
+func (ec *executionContext) _CodeSnippet_language(ctx context.Context, field graphql.CollectedField, obj *model.CodeSnippet) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CodeSnippet_language(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Language, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.Language)
+	fc.Result = res
+	return ec.marshalNLanguage2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐLanguage(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CodeSnippet_language(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSnippet",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Language does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CodeSnippet_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.CodeSnippet) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CodeSnippet_createdAt(ctx, field)
 	if err != nil {
@@ -1123,6 +1262,61 @@ func (ec *executionContext) fieldContext_CodeSnippet_updatedAt(_ context.Context
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CodeSnippet_compilationResult(ctx context.Context, field graphql.CollectedField, obj *model.CodeSnippet) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CodeSnippet_compilationResult(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.CompilationResult, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.CompilationResult)
+	fc.Result = res
+	return ec.marshalOCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CodeSnippet_compilationResult(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CodeSnippet",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_CompilationResult_id(ctx, field)
+			case "codeSnippetId":
+				return ec.fieldContext_CompilationResult_codeSnippetId(ctx, field)
+			case "output":
+				return ec.fieldContext_CompilationResult_output(ctx, field)
+			case "status":
+				return ec.fieldContext_CompilationResult_status(ctx, field)
+			case "errorMessage":
+				return ec.fieldContext_CompilationResult_errorMessage(ctx, field)
+			case "createdAt":
+				return ec.fieldContext_CompilationResult_createdAt(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CompilationResult", field.Name)
 		},
 	}
 	return fc, nil
@@ -1260,6 +1454,91 @@ func (ec *executionContext) fieldContext_CompilationResult_output(_ context.Cont
 	return fc, nil
 }
 
+func (ec *executionContext) _CompilationResult_status(ctx context.Context, field graphql.CollectedField, obj *model.CompilationResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CompilationResult_status(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Status, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.CompilationStatus)
+	fc.Result = res
+	return ec.marshalNCompilationStatus2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationStatus(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CompilationResult_status(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CompilationResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type CompilationStatus does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CompilationResult_errorMessage(ctx context.Context, field graphql.CollectedField, obj *model.CompilationResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CompilationResult_errorMessage(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.ErrorMessage, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CompilationResult_errorMessage(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CompilationResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _CompilationResult_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.CompilationResult) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_CompilationResult_createdAt(ctx, field)
 	if err != nil {
@@ -1292,50 +1571,6 @@ func (ec *executionContext) _CompilationResult_createdAt(ctx context.Context, fi
 }
 
 func (ec *executionContext) fieldContext_CompilationResult_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "CompilationResult",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _CompilationResult_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.CompilationResult) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_CompilationResult_updatedAt(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.UpdatedAt, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_CompilationResult_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "CompilationResult",
 		Field:      field,
@@ -1436,134 +1671,8 @@ func (ec *executionContext) fieldContext_CompletionChunk_isLast(_ context.Contex
 	return fc, nil
 }
 
-func (ec *executionContext) _Error_message(ctx context.Context, field graphql.CollectedField, obj *model.Error) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Error_message(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.Message, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Error_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Error",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Error_lineNumber(ctx context.Context, field graphql.CollectedField, obj *model.Error) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Error_lineNumber(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.LineNumber, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Error_lineNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Error",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Error_columnNumber(ctx context.Context, field graphql.CollectedField, obj *model.Error) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Error_columnNumber(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ColumnNumber, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*int)
-	fc.Result = res
-	return ec.marshalOInt2ᚖint(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Error_columnNumber(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Error",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Int does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Explanation_id(ctx context.Context, field graphql.CollectedField, obj *model.Explanation) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Explanation_id(ctx, field)
+func (ec *executionContext) _ConversionHistory_id(ctx context.Context, field graphql.CollectedField, obj *model.ConversionHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConversionHistory_id(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1593,9 +1702,9 @@ func (ec *executionContext) _Explanation_id(ctx context.Context, field graphql.C
 	return ec.marshalNID2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Explanation_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ConversionHistory_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "Explanation",
+		Object:     "ConversionHistory",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1606,8 +1715,8 @@ func (ec *executionContext) fieldContext_Explanation_id(_ context.Context, field
 	return fc, nil
 }
 
-func (ec *executionContext) _Explanation_codeSnippetId(ctx context.Context, field graphql.CollectedField, obj *model.Explanation) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Explanation_codeSnippetId(ctx, field)
+func (ec *executionContext) _ConversionHistory_conversionRequest(ctx context.Context, field graphql.CollectedField, obj *model.ConversionHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConversionHistory_conversionRequest(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1620,7 +1729,7 @@ func (ec *executionContext) _Explanation_codeSnippetId(ctx context.Context, fiel
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.CodeSnippetID, nil
+		return obj.ConversionRequest, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1632,26 +1741,34 @@ func (ec *executionContext) _Explanation_codeSnippetId(ctx context.Context, fiel
 		}
 		return graphql.Null
 	}
-	res := resTmp.(string)
+	res := resTmp.(*model.TritonConversionRequest)
 	fc.Result = res
-	return ec.marshalNID2string(ctx, field.Selections, res)
+	return ec.marshalNTritonConversionRequest2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionRequest(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Explanation_codeSnippetId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ConversionHistory_conversionRequest(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "Explanation",
+		Object:     "ConversionHistory",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type ID does not have child fields")
+			switch field.Name {
+			case "pythonVersion":
+				return ec.fieldContext_TritonConversionRequest_pythonVersion(ctx, field)
+			case "pythonPackages":
+				return ec.fieldContext_TritonConversionRequest_pythonPackages(ctx, field)
+			case "pythonCode":
+				return ec.fieldContext_TritonConversionRequest_pythonCode(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type TritonConversionRequest", field.Name)
 		},
 	}
 	return fc, nil
 }
 
-func (ec *executionContext) _Explanation_explanation(ctx context.Context, field graphql.CollectedField, obj *model.Explanation) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Explanation_explanation(ctx, field)
+func (ec *executionContext) _ConversionHistory_tritonCode(ctx context.Context, field graphql.CollectedField, obj *model.ConversionHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConversionHistory_tritonCode(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1664,7 +1781,7 @@ func (ec *executionContext) _Explanation_explanation(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Explanation, nil
+		return obj.TritonCode, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1681,53 +1798,9 @@ func (ec *executionContext) _Explanation_explanation(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Explanation_explanation(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ConversionHistory_tritonCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "Explanation",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Explanation_createdAt(ctx context.Context, field graphql.CollectedField, obj *model.Explanation) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Explanation_createdAt(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.CreatedAt, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(string)
-	fc.Result = res
-	return ec.marshalNString2string(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Explanation_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Explanation",
+		Object:     "ConversionHistory",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1738,8 +1811,8 @@ func (ec *executionContext) fieldContext_Explanation_createdAt(_ context.Context
 	return fc, nil
 }
 
-func (ec *executionContext) _Explanation_updatedAt(ctx context.Context, field graphql.CollectedField, obj *model.Explanation) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Explanation_updatedAt(ctx, field)
+func (ec *executionContext) _ConversionHistory_timestamp(ctx context.Context, field graphql.CollectedField, obj *model.ConversionHistory) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConversionHistory_timestamp(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1752,7 +1825,7 @@ func (ec *executionContext) _Explanation_updatedAt(ctx context.Context, field gr
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.UpdatedAt, nil
+		return obj.Timestamp, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1769,9 +1842,9 @@ func (ec *executionContext) _Explanation_updatedAt(ctx context.Context, field gr
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Explanation_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_ConversionHistory_timestamp(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
-		Object:     "Explanation",
+		Object:     "ConversionHistory",
 		Field:      field,
 		IsMethod:   false,
 		IsResolver: false,
@@ -1796,7 +1869,7 @@ func (ec *executionContext) _Mutation_createCodeSnippet(ctx context.Context, fie
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().CreateCodeSnippet(rctx, fc.Args["content"].(string))
+		return ec.resolvers.Mutation().CreateCodeSnippet(rctx, fc.Args["content"].(string), fc.Args["language"].(model.Language))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1810,7 +1883,7 @@ func (ec *executionContext) _Mutation_createCodeSnippet(ctx context.Context, fie
 	}
 	res := resTmp.(*model.CodeSnippet)
 	fc.Result = res
-	return ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res)
+	return ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_createCodeSnippet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1825,10 +1898,14 @@ func (ec *executionContext) fieldContext_Mutation_createCodeSnippet(ctx context.
 				return ec.fieldContext_CodeSnippet_id(ctx, field)
 			case "content":
 				return ec.fieldContext_CodeSnippet_content(ctx, field)
+			case "language":
+				return ec.fieldContext_CodeSnippet_language(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CodeSnippet_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_CodeSnippet_updatedAt(ctx, field)
+			case "compilationResult":
+				return ec.fieldContext_CodeSnippet_compilationResult(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CodeSnippet", field.Name)
 		},
@@ -1875,7 +1952,7 @@ func (ec *executionContext) _Mutation_updateCodeSnippet(ctx context.Context, fie
 	}
 	res := resTmp.(*model.CodeSnippet)
 	fc.Result = res
-	return ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res)
+	return ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Mutation_updateCodeSnippet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -1890,10 +1967,14 @@ func (ec *executionContext) fieldContext_Mutation_updateCodeSnippet(ctx context.
 				return ec.fieldContext_CodeSnippet_id(ctx, field)
 			case "content":
 				return ec.fieldContext_CodeSnippet_content(ctx, field)
+			case "language":
+				return ec.fieldContext_CodeSnippet_language(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CodeSnippet_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_CodeSnippet_updatedAt(ctx, field)
+			case "compilationResult":
+				return ec.fieldContext_CodeSnippet_compilationResult(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CodeSnippet", field.Name)
 		},
@@ -1967,8 +2048,8 @@ func (ec *executionContext) fieldContext_Mutation_deleteCodeSnippet(ctx context.
 	return fc, nil
 }
 
-func (ec *executionContext) _Mutation_generateExplanation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_generateExplanation(ctx, field)
+func (ec *executionContext) _Mutation_compileCodeSnippet(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_compileCodeSnippet(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -1981,7 +2062,7 @@ func (ec *executionContext) _Mutation_generateExplanation(ctx context.Context, f
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().GenerateExplanation(rctx, fc.Args["codeSnippetId"].(string))
+		return ec.resolvers.Mutation().CompileCodeSnippet(rctx, fc.Args["id"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -1993,12 +2074,12 @@ func (ec *executionContext) _Mutation_generateExplanation(ctx context.Context, f
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*model.Explanation)
+	res := resTmp.(*model.CompilationResult)
 	fc.Result = res
-	return ec.marshalNExplanation2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐExplanation(ctx, field.Selections, res)
+	return ec.marshalNCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_generateExplanation(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_compileCodeSnippet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -2007,17 +2088,19 @@ func (ec *executionContext) fieldContext_Mutation_generateExplanation(ctx contex
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_Explanation_id(ctx, field)
+				return ec.fieldContext_CompilationResult_id(ctx, field)
 			case "codeSnippetId":
-				return ec.fieldContext_Explanation_codeSnippetId(ctx, field)
-			case "explanation":
-				return ec.fieldContext_Explanation_explanation(ctx, field)
+				return ec.fieldContext_CompilationResult_codeSnippetId(ctx, field)
+			case "output":
+				return ec.fieldContext_CompilationResult_output(ctx, field)
+			case "status":
+				return ec.fieldContext_CompilationResult_status(ctx, field)
+			case "errorMessage":
+				return ec.fieldContext_CompilationResult_errorMessage(ctx, field)
 			case "createdAt":
-				return ec.fieldContext_Explanation_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Explanation_updatedAt(ctx, field)
+				return ec.fieldContext_CompilationResult_createdAt(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Explanation", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type CompilationResult", field.Name)
 		},
 	}
 	defer func() {
@@ -2027,7 +2110,72 @@ func (ec *executionContext) fieldContext_Mutation_generateExplanation(ctx contex
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_generateExplanation_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_compileCodeSnippet_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_saveConversion(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_saveConversion(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().SaveConversion(rctx, fc.Args["pythonCode"].(string), fc.Args["tritonCode"].(string))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.ConversionHistory)
+	fc.Result = res
+	return ec.marshalNConversionHistory2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐConversionHistory(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_saveConversion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_ConversionHistory_id(ctx, field)
+			case "conversionRequest":
+				return ec.fieldContext_ConversionHistory_conversionRequest(ctx, field)
+			case "tritonCode":
+				return ec.fieldContext_ConversionHistory_tritonCode(ctx, field)
+			case "timestamp":
+				return ec.fieldContext_ConversionHistory_timestamp(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConversionHistory", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_saveConversion_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2059,7 +2207,7 @@ func (ec *executionContext) _Query_getCodeSnippet(ctx context.Context, field gra
 	}
 	res := resTmp.(*model.CodeSnippet)
 	fc.Result = res
-	return ec.marshalOCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res)
+	return ec.marshalOCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_getCodeSnippet(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2074,10 +2222,14 @@ func (ec *executionContext) fieldContext_Query_getCodeSnippet(ctx context.Contex
 				return ec.fieldContext_CodeSnippet_id(ctx, field)
 			case "content":
 				return ec.fieldContext_CodeSnippet_content(ctx, field)
+			case "language":
+				return ec.fieldContext_CodeSnippet_language(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CodeSnippet_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_CodeSnippet_updatedAt(ctx, field)
+			case "compilationResult":
+				return ec.fieldContext_CodeSnippet_compilationResult(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CodeSnippet", field.Name)
 		},
@@ -2124,7 +2276,7 @@ func (ec *executionContext) _Query_getAllCodeSnippets(ctx context.Context, field
 	}
 	res := resTmp.([]*model.CodeSnippet)
 	fc.Result = res
-	return ec.marshalNCodeSnippet2ᚕᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippetᚄ(ctx, field.Selections, res)
+	return ec.marshalNCodeSnippet2ᚕᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippetᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_getAllCodeSnippets(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2139,10 +2291,14 @@ func (ec *executionContext) fieldContext_Query_getAllCodeSnippets(_ context.Cont
 				return ec.fieldContext_CodeSnippet_id(ctx, field)
 			case "content":
 				return ec.fieldContext_CodeSnippet_content(ctx, field)
+			case "language":
+				return ec.fieldContext_CodeSnippet_language(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CodeSnippet_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_CodeSnippet_updatedAt(ctx, field)
+			case "compilationResult":
+				return ec.fieldContext_CodeSnippet_compilationResult(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CodeSnippet", field.Name)
 		},
@@ -2175,7 +2331,7 @@ func (ec *executionContext) _Query_getCompilationResult(ctx context.Context, fie
 	}
 	res := resTmp.(*model.CompilationResult)
 	fc.Result = res
-	return ec.marshalOCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompilationResult(ctx, field.Selections, res)
+	return ec.marshalOCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_getCompilationResult(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -2192,10 +2348,12 @@ func (ec *executionContext) fieldContext_Query_getCompilationResult(ctx context.
 				return ec.fieldContext_CompilationResult_codeSnippetId(ctx, field)
 			case "output":
 				return ec.fieldContext_CompilationResult_output(ctx, field)
+			case "status":
+				return ec.fieldContext_CompilationResult_status(ctx, field)
+			case "errorMessage":
+				return ec.fieldContext_CompilationResult_errorMessage(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CompilationResult_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_CompilationResult_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CompilationResult", field.Name)
 		},
@@ -2214,8 +2372,8 @@ func (ec *executionContext) fieldContext_Query_getCompilationResult(ctx context.
 	return fc, nil
 }
 
-func (ec *executionContext) _Query_getExplanation(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_getExplanation(ctx, field)
+func (ec *executionContext) _Query_getConversionHistory(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_getConversionHistory(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -2228,21 +2386,24 @@ func (ec *executionContext) _Query_getExplanation(ctx context.Context, field gra
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().GetExplanation(rctx, fc.Args["id"].(string))
+		return ec.resolvers.Query().GetConversionHistory(rctx)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.(*model.Explanation)
+	res := resTmp.([]*model.ConversionHistory)
 	fc.Result = res
-	return ec.marshalOExplanation2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐExplanation(ctx, field.Selections, res)
+	return ec.marshalNConversionHistory2ᚕᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐConversionHistoryᚄ(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Query_getExplanation(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Query_getConversionHistory(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -2251,29 +2412,16 @@ func (ec *executionContext) fieldContext_Query_getExplanation(ctx context.Contex
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
 			case "id":
-				return ec.fieldContext_Explanation_id(ctx, field)
-			case "codeSnippetId":
-				return ec.fieldContext_Explanation_codeSnippetId(ctx, field)
-			case "explanation":
-				return ec.fieldContext_Explanation_explanation(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Explanation_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Explanation_updatedAt(ctx, field)
+				return ec.fieldContext_ConversionHistory_id(ctx, field)
+			case "conversionRequest":
+				return ec.fieldContext_ConversionHistory_conversionRequest(ctx, field)
+			case "tritonCode":
+				return ec.fieldContext_ConversionHistory_tritonCode(ctx, field)
+			case "timestamp":
+				return ec.fieldContext_ConversionHistory_timestamp(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Explanation", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type ConversionHistory", field.Name)
 		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_getExplanation_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -2491,7 +2639,7 @@ func (ec *executionContext) _Subscription_codeSnippetUpdated(ctx context.Context
 				w.Write([]byte{'{'})
 				graphql.MarshalString(field.Alias).MarshalGQL(w)
 				w.Write([]byte{':'})
-				ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res).MarshalGQL(w)
+				ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx, field.Selections, res).MarshalGQL(w)
 				w.Write([]byte{'}'})
 			})
 		case <-ctx.Done():
@@ -2512,10 +2660,14 @@ func (ec *executionContext) fieldContext_Subscription_codeSnippetUpdated(ctx con
 				return ec.fieldContext_CodeSnippet_id(ctx, field)
 			case "content":
 				return ec.fieldContext_CodeSnippet_content(ctx, field)
+			case "language":
+				return ec.fieldContext_CodeSnippet_language(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CodeSnippet_createdAt(ctx, field)
 			case "updatedAt":
 				return ec.fieldContext_CodeSnippet_updatedAt(ctx, field)
+			case "compilationResult":
+				return ec.fieldContext_CodeSnippet_compilationResult(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CodeSnippet", field.Name)
 		},
@@ -2570,7 +2722,7 @@ func (ec *executionContext) _Subscription_compilationResultUpdated(ctx context.C
 				w.Write([]byte{'{'})
 				graphql.MarshalString(field.Alias).MarshalGQL(w)
 				w.Write([]byte{':'})
-				ec.marshalNCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompilationResult(ctx, field.Selections, res).MarshalGQL(w)
+				ec.marshalNCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx, field.Selections, res).MarshalGQL(w)
 				w.Write([]byte{'}'})
 			})
 		case <-ctx.Done():
@@ -2593,10 +2745,12 @@ func (ec *executionContext) fieldContext_Subscription_compilationResultUpdated(c
 				return ec.fieldContext_CompilationResult_codeSnippetId(ctx, field)
 			case "output":
 				return ec.fieldContext_CompilationResult_output(ctx, field)
+			case "status":
+				return ec.fieldContext_CompilationResult_status(ctx, field)
+			case "errorMessage":
+				return ec.fieldContext_CompilationResult_errorMessage(ctx, field)
 			case "createdAt":
 				return ec.fieldContext_CompilationResult_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_CompilationResult_updatedAt(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type CompilationResult", field.Name)
 		},
@@ -2615,8 +2769,8 @@ func (ec *executionContext) fieldContext_Subscription_compilationResultUpdated(c
 	return fc, nil
 }
 
-func (ec *executionContext) _Subscription_errorOccurred(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
-	fc, err := ec.fieldContext_Subscription_errorOccurred(ctx, field)
+func (ec *executionContext) _Subscription_convertPythonToTriton(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
+	fc, err := ec.fieldContext_Subscription_convertPythonToTriton(ctx, field)
 	if err != nil {
 		return nil
 	}
@@ -2629,7 +2783,7 @@ func (ec *executionContext) _Subscription_errorOccurred(ctx context.Context, fie
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Subscription().ErrorOccurred(rctx, fc.Args["codeSnippetId"].(string))
+		return ec.resolvers.Subscription().ConvertPythonToTriton(rctx, fc.Args["input"].(model.TritonConversionRequestInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -2643,7 +2797,7 @@ func (ec *executionContext) _Subscription_errorOccurred(ctx context.Context, fie
 	}
 	return func(ctx context.Context) graphql.Marshaler {
 		select {
-		case res, ok := <-resTmp.(<-chan *model.Error):
+		case res, ok := <-resTmp.(<-chan *model.TritonConversionResult):
 			if !ok {
 				return nil
 			}
@@ -2651,7 +2805,7 @@ func (ec *executionContext) _Subscription_errorOccurred(ctx context.Context, fie
 				w.Write([]byte{'{'})
 				graphql.MarshalString(field.Alias).MarshalGQL(w)
 				w.Write([]byte{':'})
-				ec.marshalNError2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐError(ctx, field.Selections, res).MarshalGQL(w)
+				ec.marshalNTritonConversionResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionResult(ctx, field.Selections, res).MarshalGQL(w)
 				w.Write([]byte{'}'})
 			})
 		case <-ctx.Done():
@@ -2660,7 +2814,7 @@ func (ec *executionContext) _Subscription_errorOccurred(ctx context.Context, fie
 	}
 }
 
-func (ec *executionContext) fieldContext_Subscription_errorOccurred(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Subscription_convertPythonToTriton(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Subscription",
 		Field:      field,
@@ -2668,14 +2822,22 @@ func (ec *executionContext) fieldContext_Subscription_errorOccurred(ctx context.
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
+			case "type":
+				return ec.fieldContext_TritonConversionResult_type(ctx, field)
 			case "message":
-				return ec.fieldContext_Error_message(ctx, field)
-			case "lineNumber":
-				return ec.fieldContext_Error_lineNumber(ctx, field)
-			case "columnNumber":
-				return ec.fieldContext_Error_columnNumber(ctx, field)
+				return ec.fieldContext_TritonConversionResult_message(ctx, field)
+			case "isError":
+				return ec.fieldContext_TritonConversionResult_isError(ctx, field)
+			case "isComplete":
+				return ec.fieldContext_TritonConversionResult_isComplete(ctx, field)
+			case "timestamp":
+				return ec.fieldContext_TritonConversionResult_timestamp(ctx, field)
+			case "progress":
+				return ec.fieldContext_TritonConversionResult_progress(ctx, field)
+			case "tritonCode":
+				return ec.fieldContext_TritonConversionResult_tritonCode(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type Error", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type TritonConversionResult", field.Name)
 		},
 	}
 	defer func() {
@@ -2685,88 +2847,7 @@ func (ec *executionContext) fieldContext_Subscription_errorOccurred(ctx context.
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Subscription_errorOccurred_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Subscription_explanationGenerated(ctx context.Context, field graphql.CollectedField) (ret func(ctx context.Context) graphql.Marshaler) {
-	fc, err := ec.fieldContext_Subscription_explanationGenerated(ctx, field)
-	if err != nil {
-		return nil
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = nil
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Subscription().ExplanationGenerated(rctx, fc.Args["codeSnippetId"].(string))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return nil
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return nil
-	}
-	return func(ctx context.Context) graphql.Marshaler {
-		select {
-		case res, ok := <-resTmp.(<-chan *model.Explanation):
-			if !ok {
-				return nil
-			}
-			return graphql.WriterFunc(func(w io.Writer) {
-				w.Write([]byte{'{'})
-				graphql.MarshalString(field.Alias).MarshalGQL(w)
-				w.Write([]byte{':'})
-				ec.marshalNExplanation2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐExplanation(ctx, field.Selections, res).MarshalGQL(w)
-				w.Write([]byte{'}'})
-			})
-		case <-ctx.Done():
-			return nil
-		}
-	}
-}
-
-func (ec *executionContext) fieldContext_Subscription_explanationGenerated(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Subscription",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Explanation_id(ctx, field)
-			case "codeSnippetId":
-				return ec.fieldContext_Explanation_codeSnippetId(ctx, field)
-			case "explanation":
-				return ec.fieldContext_Explanation_explanation(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_Explanation_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_Explanation_updatedAt(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Explanation", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Subscription_explanationGenerated_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Subscription_convertPythonToTriton_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
 	}
@@ -2806,7 +2887,7 @@ func (ec *executionContext) _Subscription_genericCompletion(ctx context.Context,
 				w.Write([]byte{'{'})
 				graphql.MarshalString(field.Alias).MarshalGQL(w)
 				w.Write([]byte{':'})
-				ec.marshalOCompletionChunk2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompletionChunk(ctx, field.Selections, res).MarshalGQL(w)
+				ec.marshalOCompletionChunk2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompletionChunk(ctx, field.Selections, res).MarshalGQL(w)
 				w.Write([]byte{'}'})
 			})
 		case <-ctx.Done():
@@ -2841,6 +2922,440 @@ func (ec *executionContext) fieldContext_Subscription_genericCompletion(ctx cont
 	if fc.Args, err = ec.field_Subscription_genericCompletion_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionRequest_pythonVersion(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionRequest) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionRequest_pythonVersion(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PythonVersion, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionRequest_pythonVersion(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionRequest_pythonPackages(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionRequest) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionRequest_pythonPackages(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PythonPackages, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]string)
+	fc.Result = res
+	return ec.marshalNString2ᚕstringᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionRequest_pythonPackages(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionRequest_pythonCode(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionRequest) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionRequest_pythonCode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.PythonCode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionRequest_pythonCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionRequest",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_type(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_type(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Type, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.UpdateType)
+	fc.Result = res
+	return ec.marshalNUpdateType2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐUpdateType(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UpdateType does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_message(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_isError(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_isError(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsError, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_isError(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_isComplete(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_isComplete(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsComplete, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_isComplete(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_timestamp(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_timestamp(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timestamp, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_timestamp(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_progress(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_progress(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Progress, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*float64)
+	fc.Result = res
+	return ec.marshalOFloat2ᚖfloat64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_progress(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Float does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _TritonConversionResult_tritonCode(ctx context.Context, field graphql.CollectedField, obj *model.TritonConversionResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_TritonConversionResult_tritonCode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TritonCode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_TritonConversionResult_tritonCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "TritonConversionResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -4659,6 +5174,47 @@ func (ec *executionContext) fieldContext___Type_specifiedByURL(_ context.Context
 
 // region    **************************** input.gotpl *****************************
 
+func (ec *executionContext) unmarshalInputTritonConversionRequestInput(ctx context.Context, obj interface{}) (model.TritonConversionRequestInput, error) {
+	var it model.TritonConversionRequestInput
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"pythonVersion", "pythonPackages", "pythonCode"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "pythonVersion":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pythonVersion"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PythonVersion = data
+		case "pythonPackages":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pythonPackages"))
+			data, err := ec.unmarshalNString2ᚕstringᚄ(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PythonPackages = data
+		case "pythonCode":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("pythonCode"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.PythonCode = data
+		}
+	}
+
+	return it, nil
+}
+
 // endregion **************************** input.gotpl *****************************
 
 // region    ************************** interface.gotpl ***************************
@@ -4688,6 +5244,11 @@ func (ec *executionContext) _CodeSnippet(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "language":
+			out.Values[i] = ec._CodeSnippet_language(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
 		case "createdAt":
 			out.Values[i] = ec._CodeSnippet_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
@@ -4698,6 +5259,8 @@ func (ec *executionContext) _CodeSnippet(ctx context.Context, sel ast.SelectionS
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
+		case "compilationResult":
+			out.Values[i] = ec._CodeSnippet_compilationResult(ctx, field, obj)
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -4747,13 +5310,15 @@ func (ec *executionContext) _CompilationResult(ctx context.Context, sel ast.Sele
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "createdAt":
-			out.Values[i] = ec._CompilationResult_createdAt(ctx, field, obj)
+		case "status":
+			out.Values[i] = ec._CompilationResult_status(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "updatedAt":
-			out.Values[i] = ec._CompilationResult_updatedAt(ctx, field, obj)
+		case "errorMessage":
+			out.Values[i] = ec._CompilationResult_errorMessage(ctx, field, obj)
+		case "createdAt":
+			out.Values[i] = ec._CompilationResult_createdAt(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -4824,82 +5389,34 @@ func (ec *executionContext) _CompletionChunk(ctx context.Context, sel ast.Select
 	return out
 }
 
-var errorImplementors = []string{"Error"}
+var conversionHistoryImplementors = []string{"ConversionHistory"}
 
-func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, obj *model.Error) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, errorImplementors)
-
-	out := graphql.NewFieldSet(fields)
-	deferred := make(map[string]*graphql.FieldSet)
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("Error")
-		case "message":
-			out.Values[i] = ec._Error_message(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "lineNumber":
-			out.Values[i] = ec._Error_lineNumber(ctx, field, obj)
-		case "columnNumber":
-			out.Values[i] = ec._Error_columnNumber(ctx, field, obj)
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch(ctx)
-	if out.Invalids > 0 {
-		return graphql.Null
-	}
-
-	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
-
-	for label, dfs := range deferred {
-		ec.processDeferredGroup(graphql.DeferredGroup{
-			Label:    label,
-			Path:     graphql.GetPath(ctx),
-			FieldSet: dfs,
-			Context:  ctx,
-		})
-	}
-
-	return out
-}
-
-var explanationImplementors = []string{"Explanation"}
-
-func (ec *executionContext) _Explanation(ctx context.Context, sel ast.SelectionSet, obj *model.Explanation) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, explanationImplementors)
+func (ec *executionContext) _ConversionHistory(ctx context.Context, sel ast.SelectionSet, obj *model.ConversionHistory) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, conversionHistoryImplementors)
 
 	out := graphql.NewFieldSet(fields)
 	deferred := make(map[string]*graphql.FieldSet)
 	for i, field := range fields {
 		switch field.Name {
 		case "__typename":
-			out.Values[i] = graphql.MarshalString("Explanation")
+			out.Values[i] = graphql.MarshalString("ConversionHistory")
 		case "id":
-			out.Values[i] = ec._Explanation_id(ctx, field, obj)
+			out.Values[i] = ec._ConversionHistory_id(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "codeSnippetId":
-			out.Values[i] = ec._Explanation_codeSnippetId(ctx, field, obj)
+		case "conversionRequest":
+			out.Values[i] = ec._ConversionHistory_conversionRequest(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "explanation":
-			out.Values[i] = ec._Explanation_explanation(ctx, field, obj)
+		case "tritonCode":
+			out.Values[i] = ec._ConversionHistory_tritonCode(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "createdAt":
-			out.Values[i] = ec._Explanation_createdAt(ctx, field, obj)
-			if out.Values[i] == graphql.Null {
-				out.Invalids++
-			}
-		case "updatedAt":
-			out.Values[i] = ec._Explanation_updatedAt(ctx, field, obj)
+		case "timestamp":
+			out.Values[i] = ec._ConversionHistory_timestamp(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -4966,9 +5483,16 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
-		case "generateExplanation":
+		case "compileCodeSnippet":
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_generateExplanation(ctx, field)
+				return ec._Mutation_compileCodeSnippet(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "saveConversion":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_saveConversion(ctx, field)
 			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
@@ -5075,16 +5599,19 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			}
 
 			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "getExplanation":
+		case "getConversionHistory":
 			field := field
 
-			innerFunc := func(ctx context.Context, _ *graphql.FieldSet) (res graphql.Marshaler) {
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
 				defer func() {
 					if r := recover(); r != nil {
 						ec.Error(ctx, ec.Recover(ctx, r))
 					}
 				}()
-				res = ec._Query_getExplanation(ctx, field)
+				res = ec._Query_getConversionHistory(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
 				return res
 			}
 
@@ -5164,15 +5691,125 @@ func (ec *executionContext) _Subscription(ctx context.Context, sel ast.Selection
 		return ec._Subscription_codeSnippetUpdated(ctx, fields[0])
 	case "compilationResultUpdated":
 		return ec._Subscription_compilationResultUpdated(ctx, fields[0])
-	case "errorOccurred":
-		return ec._Subscription_errorOccurred(ctx, fields[0])
-	case "explanationGenerated":
-		return ec._Subscription_explanationGenerated(ctx, fields[0])
+	case "convertPythonToTriton":
+		return ec._Subscription_convertPythonToTriton(ctx, fields[0])
 	case "genericCompletion":
 		return ec._Subscription_genericCompletion(ctx, fields[0])
 	default:
 		panic("unknown field " + strconv.Quote(fields[0].Name))
 	}
+}
+
+var tritonConversionRequestImplementors = []string{"TritonConversionRequest"}
+
+func (ec *executionContext) _TritonConversionRequest(ctx context.Context, sel ast.SelectionSet, obj *model.TritonConversionRequest) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tritonConversionRequestImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TritonConversionRequest")
+		case "pythonVersion":
+			out.Values[i] = ec._TritonConversionRequest_pythonVersion(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pythonPackages":
+			out.Values[i] = ec._TritonConversionRequest_pythonPackages(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "pythonCode":
+			out.Values[i] = ec._TritonConversionRequest_pythonCode(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var tritonConversionResultImplementors = []string{"TritonConversionResult"}
+
+func (ec *executionContext) _TritonConversionResult(ctx context.Context, sel ast.SelectionSet, obj *model.TritonConversionResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, tritonConversionResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("TritonConversionResult")
+		case "type":
+			out.Values[i] = ec._TritonConversionResult_type(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "message":
+			out.Values[i] = ec._TritonConversionResult_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isError":
+			out.Values[i] = ec._TritonConversionResult_isError(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "isComplete":
+			out.Values[i] = ec._TritonConversionResult_isComplete(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "timestamp":
+			out.Values[i] = ec._TritonConversionResult_timestamp(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "progress":
+			out.Values[i] = ec._TritonConversionResult_progress(ctx, field, obj)
+		case "tritonCode":
+			out.Values[i] = ec._TritonConversionResult_tritonCode(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
 }
 
 var _ServiceImplementors = []string{"_Service"}
@@ -5552,11 +6189,11 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
-func (ec *executionContext) marshalNCodeSnippet2githubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx context.Context, sel ast.SelectionSet, v model.CodeSnippet) graphql.Marshaler {
+func (ec *executionContext) marshalNCodeSnippet2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx context.Context, sel ast.SelectionSet, v model.CodeSnippet) graphql.Marshaler {
 	return ec._CodeSnippet(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNCodeSnippet2ᚕᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippetᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CodeSnippet) graphql.Marshaler {
+func (ec *executionContext) marshalNCodeSnippet2ᚕᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippetᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.CodeSnippet) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -5580,7 +6217,7 @@ func (ec *executionContext) marshalNCodeSnippet2ᚕᚖgithubᚗcomᚋtmcᚋcudal
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx, sel, v[i])
+			ret[i] = ec.marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -5600,7 +6237,7 @@ func (ec *executionContext) marshalNCodeSnippet2ᚕᚖgithubᚗcomᚋtmcᚋcudal
 	return ret
 }
 
-func (ec *executionContext) marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx context.Context, sel ast.SelectionSet, v *model.CodeSnippet) graphql.Marshaler {
+func (ec *executionContext) marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx context.Context, sel ast.SelectionSet, v *model.CodeSnippet) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -5610,11 +6247,11 @@ func (ec *executionContext) marshalNCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudalive
 	return ec._CodeSnippet(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNCompilationResult2githubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompilationResult(ctx context.Context, sel ast.SelectionSet, v model.CompilationResult) graphql.Marshaler {
+func (ec *executionContext) marshalNCompilationResult2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx context.Context, sel ast.SelectionSet, v model.CompilationResult) graphql.Marshaler {
 	return ec._CompilationResult(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompilationResult(ctx context.Context, sel ast.SelectionSet, v *model.CompilationResult) graphql.Marshaler {
+func (ec *executionContext) marshalNCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx context.Context, sel ast.SelectionSet, v *model.CompilationResult) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
@@ -5624,32 +6261,72 @@ func (ec *executionContext) marshalNCompilationResult2ᚖgithubᚗcomᚋtmcᚋcu
 	return ec._CompilationResult(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNError2githubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐError(ctx context.Context, sel ast.SelectionSet, v model.Error) graphql.Marshaler {
-	return ec._Error(ctx, sel, &v)
+func (ec *executionContext) unmarshalNCompilationStatus2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationStatus(ctx context.Context, v interface{}) (model.CompilationStatus, error) {
+	var res model.CompilationStatus
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNError2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐError(ctx context.Context, sel ast.SelectionSet, v *model.Error) graphql.Marshaler {
+func (ec *executionContext) marshalNCompilationStatus2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationStatus(ctx context.Context, sel ast.SelectionSet, v model.CompilationStatus) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) marshalNConversionHistory2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐConversionHistory(ctx context.Context, sel ast.SelectionSet, v model.ConversionHistory) graphql.Marshaler {
+	return ec._ConversionHistory(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNConversionHistory2ᚕᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐConversionHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.ConversionHistory) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNConversionHistory2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐConversionHistory(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNConversionHistory2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐConversionHistory(ctx context.Context, sel ast.SelectionSet, v *model.ConversionHistory) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
 		}
 		return graphql.Null
 	}
-	return ec._Error(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalNExplanation2githubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐExplanation(ctx context.Context, sel ast.SelectionSet, v model.Explanation) graphql.Marshaler {
-	return ec._Explanation(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNExplanation2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐExplanation(ctx context.Context, sel ast.SelectionSet, v *model.Explanation) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._Explanation(ctx, sel, v)
+	return ec._ConversionHistory(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNFieldSet2string(ctx context.Context, v interface{}) (string, error) {
@@ -5682,6 +6359,16 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	return res
 }
 
+func (ec *executionContext) unmarshalNLanguage2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐLanguage(ctx context.Context, v interface{}) (model.Language, error) {
+	var res model.Language
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNLanguage2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐLanguage(ctx context.Context, sel ast.SelectionSet, v model.Language) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
 	res, err := graphql.UnmarshalString(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -5695,6 +6382,77 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
+	var vSlice []interface{}
+	if v != nil {
+		vSlice = graphql.CoerceList(v)
+	}
+	var err error
+	res := make([]string, len(vSlice))
+	for i := range vSlice {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	for i := range v {
+		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+	}
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNTritonConversionRequest2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionRequest(ctx context.Context, sel ast.SelectionSet, v *model.TritonConversionRequest) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TritonConversionRequest(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNTritonConversionRequestInput2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionRequestInput(ctx context.Context, v interface{}) (model.TritonConversionRequestInput, error) {
+	res, err := ec.unmarshalInputTritonConversionRequestInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNTritonConversionResult2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionResult(ctx context.Context, sel ast.SelectionSet, v model.TritonConversionResult) graphql.Marshaler {
+	return ec._TritonConversionResult(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNTritonConversionResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐTritonConversionResult(ctx context.Context, sel ast.SelectionSet, v *model.TritonConversionResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._TritonConversionResult(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNUpdateType2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐUpdateType(ctx context.Context, v interface{}) (model.UpdateType, error) {
+	var res model.UpdateType
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNUpdateType2githubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐUpdateType(ctx context.Context, sel ast.SelectionSet, v model.UpdateType) graphql.Marshaler {
+	return v
 }
 
 func (ec *executionContext) marshalN_Service2githubᚗcomᚋ99designsᚋgqlgenᚋpluginᚋfederationᚋfedruntimeᚐService(ctx context.Context, sel ast.SelectionSet, v fedruntime.Service) graphql.Marshaler {
@@ -6138,48 +6896,41 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) marshalOCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCodeSnippet(ctx context.Context, sel ast.SelectionSet, v *model.CodeSnippet) graphql.Marshaler {
+func (ec *executionContext) marshalOCodeSnippet2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCodeSnippet(ctx context.Context, sel ast.SelectionSet, v *model.CodeSnippet) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._CodeSnippet(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompilationResult(ctx context.Context, sel ast.SelectionSet, v *model.CompilationResult) graphql.Marshaler {
+func (ec *executionContext) marshalOCompilationResult2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompilationResult(ctx context.Context, sel ast.SelectionSet, v *model.CompilationResult) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._CompilationResult(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOCompletionChunk2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐCompletionChunk(ctx context.Context, sel ast.SelectionSet, v *model.CompletionChunk) graphql.Marshaler {
+func (ec *executionContext) marshalOCompletionChunk2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋcudaliveᚑbackendᚋgraphᚋmodelᚐCompletionChunk(ctx context.Context, sel ast.SelectionSet, v *model.CompletionChunk) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
 	return ec._CompletionChunk(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalOExplanation2ᚖgithubᚗcomᚋtmcᚋcudaliveᚋgraphᚋmodelᚐExplanation(ctx context.Context, sel ast.SelectionSet, v *model.Explanation) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._Explanation(ctx, sel, v)
-}
-
-func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v interface{}) (*int, error) {
+func (ec *executionContext) unmarshalOFloat2ᚖfloat64(ctx context.Context, v interface{}) (*float64, error) {
 	if v == nil {
 		return nil, nil
 	}
-	res, err := graphql.UnmarshalInt(v)
+	res, err := graphql.UnmarshalFloatContext(ctx, v)
 	return &res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler {
+func (ec *executionContext) marshalOFloat2ᚖfloat64(ctx context.Context, sel ast.SelectionSet, v *float64) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
-	res := graphql.MarshalInt(*v)
-	return res
+	res := graphql.MarshalFloatContext(*v)
+	return graphql.WrapContextMarshaler(ctx, res)
 }
 
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {

@@ -50,8 +50,8 @@ export type CompletionChunk = {
 
 export type ConversionHistory = {
   __typename?: 'ConversionHistory';
+  conversionRequest: TritonConversionRequest;
   id: Scalars['ID']['output'];
-  pythonCode: Scalars['String']['output'];
   timestamp: Scalars['String']['output'];
   tritonCode: Scalars['String']['output'];
 };
@@ -120,7 +120,7 @@ export type Subscription = {
   __typename?: 'Subscription';
   codeSnippetUpdated: CodeSnippet;
   compilationResultUpdated: CompilationResult;
-  convertPythonToTriton: UpdateMessage;
+  convertPythonToTriton: TritonConversionResult;
   genericCompletion?: Maybe<CompletionChunk>;
 };
 
@@ -136,7 +136,7 @@ export type SubscriptionCompilationResultUpdatedArgs = {
 
 
 export type SubscriptionConvertPythonToTritonArgs = {
-  pythonCode: Scalars['String']['input'];
+  input: TritonConversionRequestInput;
 };
 
 
@@ -144,8 +144,21 @@ export type SubscriptionGenericCompletionArgs = {
   prompt: Scalars['String']['input'];
 };
 
-export type UpdateMessage = {
-  __typename?: 'UpdateMessage';
+export type TritonConversionRequest = {
+  __typename?: 'TritonConversionRequest';
+  pythonCode: Scalars['String']['output'];
+  pythonPackages: Array<Scalars['String']['output']>;
+  pythonVersion: Scalars['String']['output'];
+};
+
+export type TritonConversionRequestInput = {
+  pythonCode: Scalars['String']['input'];
+  pythonPackages: Array<Scalars['String']['input']>;
+  pythonVersion: Scalars['String']['input'];
+};
+
+export type TritonConversionResult = {
+  __typename?: 'TritonConversionResult';
   isComplete: Scalars['Boolean']['output'];
   isError: Scalars['Boolean']['output'];
   message: Scalars['String']['output'];
@@ -172,11 +185,11 @@ export type GenericSubscriptionSubscriptionVariables = Exact<{
 export type GenericSubscriptionSubscription = { __typename?: 'Subscription', genericCompletion?: { __typename?: 'CompletionChunk', text: string, isLast: boolean } | null };
 
 export type ConvertPythonToTritonSubscriptionVariables = Exact<{
-  pythonCode: Scalars['String']['input'];
+  input: TritonConversionRequestInput;
 }>;
 
 
-export type ConvertPythonToTritonSubscription = { __typename?: 'Subscription', convertPythonToTriton: { __typename?: 'UpdateMessage', type: UpdateType, message: string, isError: boolean, isComplete: boolean, timestamp: string, progress?: number | null, tritonCode?: string | null } };
+export type ConvertPythonToTritonSubscription = { __typename?: 'Subscription', convertPythonToTriton: { __typename?: 'TritonConversionResult', type: UpdateType, message: string, isError: boolean, isComplete: boolean, timestamp: string, progress?: number | null, tritonCode?: string | null } };
 
 export type SaveConversionMutationVariables = Exact<{
   pythonCode: Scalars['String']['input'];
@@ -184,9 +197,9 @@ export type SaveConversionMutationVariables = Exact<{
 }>;
 
 
-export type SaveConversionMutation = { __typename?: 'Mutation', saveConversion: { __typename?: 'ConversionHistory', id: string, pythonCode: string, tritonCode: string, timestamp: string } };
+export type SaveConversionMutation = { __typename?: 'Mutation', saveConversion: { __typename?: 'ConversionHistory', id: string, tritonCode: string, timestamp: string, conversionRequest: { __typename?: 'TritonConversionRequest', pythonVersion: string, pythonPackages: Array<string>, pythonCode: string } } };
 
 
 export const GenericSubscriptionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"GenericSubscription"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"prompt"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"genericCompletion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"prompt"},"value":{"kind":"Variable","name":{"kind":"Name","value":"prompt"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"text"}},{"kind":"Field","name":{"kind":"Name","value":"isLast"}}]}}]}}]} as unknown as DocumentNode<GenericSubscriptionSubscription, GenericSubscriptionSubscriptionVariables>;
-export const ConvertPythonToTritonDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"ConvertPythonToTriton"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pythonCode"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"convertPythonToTriton"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"pythonCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pythonCode"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"isError"}},{"kind":"Field","name":{"kind":"Name","value":"isComplete"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"progress"}},{"kind":"Field","name":{"kind":"Name","value":"tritonCode"}}]}}]}}]} as unknown as DocumentNode<ConvertPythonToTritonSubscription, ConvertPythonToTritonSubscriptionVariables>;
-export const SaveConversionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveConversion"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pythonCode"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tritonCode"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveConversion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"pythonCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pythonCode"}}},{"kind":"Argument","name":{"kind":"Name","value":"tritonCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tritonCode"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"pythonCode"}},{"kind":"Field","name":{"kind":"Name","value":"tritonCode"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}}]}}]}}]} as unknown as DocumentNode<SaveConversionMutation, SaveConversionMutationVariables>;
+export const ConvertPythonToTritonDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"subscription","name":{"kind":"Name","value":"ConvertPythonToTriton"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"TritonConversionRequestInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"convertPythonToTriton"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"type"}},{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"isError"}},{"kind":"Field","name":{"kind":"Name","value":"isComplete"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}},{"kind":"Field","name":{"kind":"Name","value":"progress"}},{"kind":"Field","name":{"kind":"Name","value":"tritonCode"}}]}}]}}]} as unknown as DocumentNode<ConvertPythonToTritonSubscription, ConvertPythonToTritonSubscriptionVariables>;
+export const SaveConversionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SaveConversion"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pythonCode"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"tritonCode"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"saveConversion"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"pythonCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pythonCode"}}},{"kind":"Argument","name":{"kind":"Name","value":"tritonCode"},"value":{"kind":"Variable","name":{"kind":"Name","value":"tritonCode"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"conversionRequest"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pythonVersion"}},{"kind":"Field","name":{"kind":"Name","value":"pythonPackages"}},{"kind":"Field","name":{"kind":"Name","value":"pythonCode"}}]}},{"kind":"Field","name":{"kind":"Name","value":"tritonCode"}},{"kind":"Field","name":{"kind":"Name","value":"timestamp"}}]}}]}}]} as unknown as DocumentNode<SaveConversionMutation, SaveConversionMutationVariables>;

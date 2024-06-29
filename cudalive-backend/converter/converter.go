@@ -2,6 +2,7 @@ package converter
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
@@ -18,7 +19,7 @@ import (
 )
 
 const (
-	pythonVersion = "3.9"
+	pythonVersion = "3.11"
 	torchVersion  = "2.3.0"
 	cacheTimeout  = 24 * time.Hour // Cache virtual environments for 24 hours
 )
@@ -28,11 +29,17 @@ type Converter struct {
 	cacheMutex sync.Mutex
 	cacheDir   string
 	logger     *log.Logger
+
+	buf *bytes.Buffer
 }
 
 type ConversionResult struct {
 	TritonCode string
 	Logs       string
+}
+
+func Ptr[T any](t T) *T {
+	return &t
 }
 
 func NewConverter(baseDir string) (*Converter, error) {
@@ -51,48 +58,52 @@ func NewConverter(baseDir string) (*Converter, error) {
 		baseDir:  baseDir,
 		cacheDir: cacheDir,
 		logger:   logger,
+		buf:      new(bytes.Buffer),
 	}, nil
 }
 
-func (c *Converter) ConvertPythonToTriton(pythonCode string, additionalPackages []string, updateChan chan<- *model.TritonConversionResult) (*ConversionResult, error) {
-	c.logger.Println("Starting conversion process")
-	c.sendUpdate(updateChan, model.UpdateTypeInitialization, "Starting conversion process", false, false, nil, nil)
+func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, additionalPackages []string, updateChan chan<- *model.TritonConversionResult) (*ConversionResult, error) {
+	c.buf.Reset()
+	c.buf.Write([]byte("# Converted to triton by CUDALive\n"))
+	c.logger.Println("Starting triton conversion process")
+	c.sendUpdate(updateChan, model.UpdateTypeInitialization, "Starting triton conversion process", false, false, nil)
 
 	// Create or get cached virtual environment
 	envPath, err := c.getOrCreateVirtualEnv(additionalPackages, updateChan)
 	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to set up virtual environment: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to set up virtual environment: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to set up virtual environment: %w", err)
 	}
 
-	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Creating temporary Python file", false, false, nil, nil)
+	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Creating temporary Python file", false, false, nil)
 	// Create a temporary Python file with the conversion code
 	tmpfile, err := c.createTempPythonFile(pythonCode)
 	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create temporary Python file: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create temporary Python file: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to create temporary Python file: %w", err)
 	}
-	defer os.Remove(tmpfile.Name())
+	c.buf.Write([]byte(fmt.Sprintf("# Python script: %s\n", tmpfile.Name())))
+	// defer os.Remove(tmpfile.Name())
 
-	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Running conversion script", false, false, nil, nil)
+	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Running conversion script", false, false, nil)
 	// Run the conversion script in the virtual environment
 	cmd := exec.Command(filepath.Join(envPath, "bin", "python"), tmpfile.Name())
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", envPath))
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create stdout pipe: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create stdout pipe: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create stderr pipe: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create stderr pipe: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to create stderr pipe: %w", err)
 	}
 
 	if err := cmd.Start(); err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to start conversion command: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to start conversion command: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to start conversion command: %w", err)
 	}
 
@@ -100,11 +111,11 @@ func (c *Converter) ConvertPythonToTriton(pythonCode string, additionalPackages 
 	go c.streamOutput(stderr, updateChan, true)
 
 	if err := cmd.Wait(); err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Conversion failed: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Conversion failed: %v", err), true, false, nil)
 		return nil, fmt.Errorf("conversion failed: %w", err)
 	}
 
-	c.sendUpdate(updateChan, model.UpdateTypeCompletion, "Conversion completed successfully", false, true, nil, nil)
+	c.sendUpdate(updateChan, model.UpdateTypeCompletion, "Conversion completed successfully", false, true, nil)
 
 	return &ConversionResult{
 		TritonCode: "Streamed to client",
@@ -112,7 +123,7 @@ func (c *Converter) ConvertPythonToTriton(pythonCode string, additionalPackages 
 	}, nil
 }
 
-func (c *Converter) sendUpdate(updateChan chan<- *model.TritonConversionResult, updateType model.UpdateType, message string, isError bool, isComplete bool, progress *float64, tritonCode *string) {
+func (c *Converter) sendUpdate(updateChan chan<- *model.TritonConversionResult, updateType model.UpdateType, message string, isError bool, isComplete bool, progress *float64) {
 	updateChan <- &model.TritonConversionResult{
 		Type:       updateType,
 		Message:    message,
@@ -120,8 +131,9 @@ func (c *Converter) sendUpdate(updateChan chan<- *model.TritonConversionResult, 
 		IsComplete: isComplete,
 		Timestamp:  time.Now().Format(time.RFC3339),
 		Progress:   progress,
-		TritonCode: tritonCode,
+		TritonCode: Ptr(c.buf.String()),
 	}
+	time.Sleep(time.Millisecond * 150) // artificial delay
 }
 
 func (c *Converter) streamOutput(reader io.Reader, updateChan chan<- *model.TritonConversionResult, isError bool) {
@@ -130,8 +142,12 @@ func (c *Converter) streamOutput(reader io.Reader, updateChan chan<- *model.Trit
 		updateType := model.UpdateTypeConversionProgress
 		if isError {
 			updateType = model.UpdateTypeError
+			c.buf.Write(scanner.Bytes())
+		} else {
+			// add to c.buf:
+			c.buf.Write(scanner.Bytes())
 		}
-		c.sendUpdate(updateChan, updateType, scanner.Text(), isError, false, nil, nil)
+		c.sendUpdate(updateChan, updateType, scanner.Text(), isError, false, nil)
 	}
 }
 
@@ -145,19 +161,20 @@ func (c *Converter) getOrCreateVirtualEnv(additionalPackages []string, updateCha
 	// Check if a valid cached environment exists
 	if c.isValidCachedEnv(envPath) {
 		c.logger.Printf("Using cached virtual environment: %s", envPath)
-		c.sendUpdate(updateChan, model.UpdateTypeEnvironmentSetup, "Using cached virtual environment", false, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeEnvironmentSetup, "Using cached virtual environment", false, false, nil)
 		return envPath, nil
 	}
 
 	// Create a new virtual environment
-	c.logger.Println("Creating new virtual environment")
-	c.sendUpdate(updateChan, model.UpdateTypeEnvironmentSetup, "Creating new virtual environment", false, false, nil, nil)
+	c.logger.Println("Creating new virtual environment (not cached)")
+	c.sendUpdate(updateChan, model.UpdateTypeEnvironmentSetup, "Creating new virtual environment", false, false, nil)
 	if err := c.createVirtualEnv(envPath); err != nil {
 		return "", err
 	}
 
 	// Install PyTorch and additional packages
-	c.sendUpdate(updateChan, model.UpdateTypePackageInstallation, "Installing PyTorch and additional packages", false, false, nil, nil)
+	msg := fmt.Sprintf("Installing PyTorch %s and additional packages (%s)", torchVersion, strings.Join(additionalPackages, ", "))
+	c.sendUpdate(updateChan, model.UpdateTypePackageInstallation, msg, false, false, nil)
 	if err := c.installPackages(envPath, additionalPackages, updateChan); err != nil {
 		os.RemoveAll(envPath) // Clean up on failure
 		return "", err
@@ -192,22 +209,22 @@ func (c *Converter) installPackages(envPath string, additionalPackages []string,
 	pipPath := filepath.Join(envPath, "bin", "pip")
 
 	// Install PyTorch
-	c.sendUpdate(updateChan, model.UpdateTypePackageInstallation, fmt.Sprintf("Installing PyTorch %s", torchVersion), false, false, nil, nil)
+	c.sendUpdate(updateChan, model.UpdateTypePackageInstallation, fmt.Sprintf("Installing PyTorch %s", torchVersion), false, false, nil)
 	cmd := exec.Command(pipPath, "install", fmt.Sprintf("torch==%s", torchVersion))
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to install PyTorch: %v", err), true, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to install PyTorch: %v", err), true, false, nil)
 		return fmt.Errorf("failed to install PyTorch: %w\nOutput: %s", err, output)
 	}
 
 	// Install additional packages
 	if len(additionalPackages) > 0 {
-		c.sendUpdate(updateChan, model.UpdateTypePackageInstallation, fmt.Sprintf("Installing additional packages: %s", strings.Join(additionalPackages, ", ")), false, false, nil, nil)
+		c.sendUpdate(updateChan, model.UpdateTypePackageInstallation, fmt.Sprintf("Installing additional packages: %s", strings.Join(additionalPackages, ", ")), false, false, nil)
 		args := append([]string{"install"}, additionalPackages...)
 		cmd = exec.Command(pipPath, args...)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to install additional packages: %v", err), true, false, nil, nil)
+			c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to install additional packages: %v", err), true, false, nil)
 			return fmt.Errorf("failed to install additional packages: %w\nOutput: %s", err, output)
 		}
 	}
@@ -280,6 +297,7 @@ print(triton_code)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create temp file: %w", err)
 	}
+	fmt.Println("converter:", tmpfile.Name())
 
 	if _, err := tmpfile.Write([]byte(converterCode)); err != nil {
 		tmpfile.Close()
