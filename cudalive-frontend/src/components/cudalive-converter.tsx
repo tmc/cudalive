@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSubscription, useMutation, gql } from '@apollo/client';
 import { MenubarTrigger, MenubarItem, MenubarSeparator, MenubarContent, MenubarMenu, Menubar } from "@/components/ui/menubar"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -9,10 +9,10 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Loader2, Github } from "lucide-react"
 import Editor from '@monaco-editor/react';
-import { UpdateMessage, UpdateType } from '@/gql-gen/graphql'
+import { TritonConversionResult, UpdateType } from '@/gql-gen/graphql'
 
 import { defaultPythonCode } from './default-python-code';
-import { defaultTritonCode } from './default-triton-code';
+// import { defaultTritonCode } from './default-triton-code';
 
 const CONVERT_PYTHON_TO_TRITON_SUBSCRIPTION = gql`
   subscription ConvertPythonToTriton($input: TritonConversionRequestInput!) {
@@ -81,14 +81,14 @@ export function CUDALiveConverter() {
   const [error, setError] = useState<string | null>(null);
   const [gistId, setGistId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [conversionLogs, setConversionLogs] = useState<UpdateMessage[]>([]);
+  const [conversionLogs, setConversionLogs] = useState<TritonConversionResult[]>([]);
   const [conversionProgress, setConversionProgress] = useState(0);
 
   const logEndRef = useRef<HTMLDivElement>(null);
 
   const [saveConversion] = useMutation(SAVE_CONVERSION_MUTATION);
 
-  const { data, loading, error: subscriptionError } = useSubscription<{ convertPythonToTriton: UpdateMessage }>(
+  const { error: subscriptionError } = useSubscription<{ convertPythonToTriton: TritonConversionResult }>(
     CONVERT_PYTHON_TO_TRITON_SUBSCRIPTION,
     {
       variables: { input: {
@@ -108,7 +108,7 @@ export function CUDALiveConverter() {
                 setTritonCode(update.tritonCode);
               }
               if (update.progress !== undefined) {
-                setConversionProgress(update.progress);
+                setConversionProgress(update.progress!);
               }
               break;
             case UpdateType.Completion:
@@ -186,7 +186,7 @@ export function CUDALiveConverter() {
     }
   };
 
-  const renderLogMessage = (index: number, log: UpdateMessage) => {
+  const renderLogMessage = (index: number, log: TritonConversionResult) => {
     const getIcon = () => {
       switch (log.type) {
         case UpdateType.Initialization: return '🚀';
