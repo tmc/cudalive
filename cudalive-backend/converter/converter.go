@@ -146,7 +146,7 @@ func resolveOutput2(buf *bytes.Buffer) ([]byte, error) {
 	return resolveOutput(buf, `kernel path: (.*)`)
 }
 
-func resolveOutput(stderrBuf *bytes.Buffer, pattern string) ([]byte, error) {
+func resolveOutputOld(stderrBuf *bytes.Buffer, pattern string) ([]byte, error) {
 	outputPathRe := regexp.MustCompile(pattern)
 	outputPath := ""
 	// scan output for the regexp (across newlines):
@@ -163,6 +163,27 @@ func resolveOutput(stderrBuf *bytes.Buffer, pattern string) ([]byte, error) {
 	if outputPath == "" {
 		return out, fmt.Errorf("failed to extract output path from logs (pattern: %s)", pattern)
 	}
+	outputCode, err := os.ReadFile(outputPath)
+	if err != nil {
+		return out, fmt.Errorf("failed to read output code: %w", err)
+	}
+	return outputCode, nil
+}
+
+func resolveOutput(stderrBuf *bytes.Buffer, pattern string) ([]byte, error) {
+	outputPathRe := regexp.MustCompile(pattern)
+	out := stderrBuf.Bytes()
+	matches := outputPathRe.FindAllSubmatch(out, -1)
+
+	if len(matches) > 1 {
+		return out, nil
+	}
+
+	if len(matches) == 0 || len(matches[0]) < 2 {
+		return out, fmt.Errorf("failed to extract output path from logs (pattern: %s)", pattern)
+	}
+
+	outputPath := string(matches[0][1])
 	outputCode, err := os.ReadFile(outputPath)
 	if err != nil {
 		return out, fmt.Errorf("failed to read output code: %w", err)
