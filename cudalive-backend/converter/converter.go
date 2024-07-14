@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/tmc/cudalive/cudalive-backend/graph/model"
 )
 
@@ -64,8 +65,8 @@ func NewConverter(baseDir string) (*Converter, error) {
 }
 
 func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, additionalPackages []string, updateChan chan<- *model.TritonConversionResult) (*ConversionResult, error) {
-	c.buf.Reset()
-	c.buf.Write([]byte("# Converted to triton by CUDALive\n"))
+	// c.buf.Reset()
+	// c.buf.Write([]byte("# Converted to triton by CUDALive\n"))
 	c.logger.Println("Starting triton conversion process")
 	c.sendUpdate(updateChan, model.UpdateTypeInitialization, "Starting triton conversion process", false, false, Ptr(5.0))
 
@@ -83,7 +84,7 @@ func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, addi
 		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to create temporary Python file: %v", err), true, false, nil)
 		return nil, fmt.Errorf("failed to create temporary Python file: %w", err)
 	}
-	c.buf.Write([]byte(fmt.Sprint("# Processing..")))
+	//c.buf.Write([]byte(fmt.Sprint("# Processing..")))
 	// defer os.Remove(tmpfile.Name())
 
 	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Running conversion script", false, false, Ptr(23.0))
@@ -91,6 +92,7 @@ func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, addi
 	cmd := exec.Command(filepath.Join(envPath, "bin", "python"), tmpfile.Name())
 	cmd.Env = append(os.Environ(), fmt.Sprintf("PYTHONPATH=%s", envPath))
 	cmd.Env = append(os.Environ(), `TORCH_LOGS=output_code`)
+	//cmd.Env = append(os.Environ(), `TORCHINDUCTOR_MAX_AUTOTUNE_GEMM_BACKENDS=TRITON`)
 
 	stdoutBuf := new(bytes.Buffer)
 	stderrBuf := new(bytes.Buffer)
@@ -109,22 +111,24 @@ func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, addi
 		c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Conversion failed: %v", err), true, false, nil)
 		return nil, fmt.Errorf("conversion failed: %w", err)
 	}
-
-	outputPathRe := regexp.MustCompile(`Output code written to: (.*)`)
-	outputPath := ""
-	// scan output for the regexp (across newlines):
-	matches := outputPathRe.FindStringSubmatch(stderrBuf.String())
-	if len(matches) > 1 {
-		outputPath = matches[1]
+	outputCode, err := resolveOutput1(stderrBuf)
+	fmt.Println("Out: ================================")
+	fmt.Println("err:", err)
+	fmt.Println("outputCode:", string(outputCode))
+	fmt.Println("Out2: ================================")
+	if err == nil {
+		outputCode, err = resolveOutput2(bytes.NewBuffer(outputCode))
+		fmt.Println("err:", err)
+		fmt.Println("outputCode:", string(outputCode))
 	}
-	if outputPath == "" {
-		return nil, fmt.Errorf("failed to extract output path from logs")
-	}
-	outputCode, err := os.ReadFile(outputPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read output code: %w", err)
-	}
+	fmt.Println("Out Done: ================================")
+	// if err != nil {
+	// 	c.sendUpdate(updateChan, model.UpdateTypeError, fmt.Sprintf("Failed to extract output code: %v", err), true, false, nil)
+	// 	return nil, fmt.Errorf("failed to extract output code: %w", err)
+	// }
+	c.buf.Reset()
 	io.Copy(c.buf, bytes.NewReader(outputCode))
+
 	fmt.Println("triton:", c.buf.String())
 	c.sendUpdate(updateChan, model.UpdateTypeConversionProgress, "Output code generated", false, true, Ptr(100.0))
 
@@ -132,6 +136,38 @@ func (c *Converter) ConvertPythonToTriton(pythonVersion, pythonCode string, addi
 		TritonCode: "Streamed to client",
 		Logs:       "Streamed to client",
 	}, nil
+}
+
+func resolveOutput1(buf *bytes.Buffer) ([]byte, error) {
+	return resolveOutput(buf, `Output code written to: (.*)`)
+}
+
+func resolveOutput2(buf *bytes.Buffer) ([]byte, error) {
+	return resolveOutput(buf, `kernel path: (.*)`)
+}
+
+func resolveOutput(stderrBuf *bytes.Buffer, pattern string) ([]byte, error) {
+	outputPathRe := regexp.MustCompile(pattern)
+	outputPath := ""
+	// scan output for the regexp (across newlines):
+	out := stderrBuf.Bytes()
+	matches := outputPathRe.FindStringSubmatch(string(out))
+	if len(matches) > 1 {
+		outputPath = matches[1]
+	}
+	spew.Dump(matches)
+	// if we find more than one, return the input as is:
+	if len(matches) > 2 {
+		return out, nil
+	}
+	if outputPath == "" {
+		return out, fmt.Errorf("failed to extract output path from logs (pattern: %s)", pattern)
+	}
+	outputCode, err := os.ReadFile(outputPath)
+	if err != nil {
+		return out, fmt.Errorf("failed to read output code: %w", err)
+	}
+	return outputCode, nil
 }
 
 func (c *Converter) sendUpdate(updateChan chan<- *model.TritonConversionResult, updateType model.UpdateType, message string, isError bool, isComplete bool, progress *float64) {

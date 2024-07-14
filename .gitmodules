@@ -1,0 +1,3 @@
+[submodule "third_party/oracle"]
+	path = third_party/oracle
+	url = https://github.com/JeremyNixon/oracle

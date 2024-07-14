@@ -1,8 +1,8 @@
 # This makefile provides helper targets for building and running the project.
 # Run `make help` to print out all the available targets.
 
-.PHONY: run-sample-service-set
-run-sample-service-set: ## Run a sample service set.
+.PHONY: run-services
+run-services: ## Run the service service set.
 	@echo "Running sample service set..."
 	@echo "To clean up and shut down all resources associated with this project, run 'make clean'"
 	@cd ./dev-harness && make deps

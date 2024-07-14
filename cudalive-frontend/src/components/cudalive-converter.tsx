@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSubscription, useMutation, gql } from '@apollo/client';
 import { MenubarTrigger, MenubarItem, MenubarSeparator, MenubarContent, MenubarMenu, Menubar } from "@/components/ui/menubar"
 import { ModeToggle } from "@/components/mode-toggle"
@@ -7,9 +7,11 @@ import { useTheme } from "@/components/theme-provider"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Loader2, Github } from "lucide-react"
+import { Loader2, Github, ChevronDown, ChevronUp } from "lucide-react"
 import Editor from '@monaco-editor/react';
 import { TritonConversionResult, UpdateType } from '@/gql-gen/graphql'
+import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
+import * as Collapsible from '@radix-ui/react-collapsible';
 
 import { defaultPythonCode } from './default-python-code';
 // import { defaultTritonCode } from './default-triton-code';
@@ -83,10 +85,20 @@ export function CUDALiveConverter() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [conversionLogs, setConversionLogs] = useState<TritonConversionResult[]>([]);
   const [conversionProgress, setConversionProgress] = useState(0);
+  const [isLogsOpen, setIsLogsOpen] = useState(true);
 
   const logEndRef = useRef<HTMLDivElement>(null);
+  const conversionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const [saveConversion] = useMutation(SAVE_CONVERSION_MUTATION);
+
+  const handleConvert = useCallback(() => {
+     setIsConverting(true);
+     //setTritonCode('');
+     setError(null);
+     setConversionLogs([]);
+     setConversionProgress(0);
+  }, []);
 
   const { error: subscriptionError } = useSubscription<{ convertPythonToTriton: TritonConversionResult }>(
     CONVERT_PYTHON_TO_TRITON_SUBSCRIPTION,
@@ -104,11 +116,14 @@ export function CUDALiveConverter() {
           
           switch (update.type) {
             case UpdateType.ConversionProgress:
-              if (update.tritonCode) {
-                setTritonCode(update.tritonCode);
-              }
               if (update.progress !== undefined) {
                 setConversionProgress(update.progress!);
+              }
+              if (update.isComplete) {
+                if (update.tritonCode) {
+                  setTritonCode(update.tritonCode);
+                }
+                setIsConverting(false);
               }
               break;
             case UpdateType.Completion:
@@ -136,13 +151,20 @@ export function CUDALiveConverter() {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [conversionLogs]);
 
-  const handleConvert = () => {
-    setIsConverting(true);
-    setTritonCode('');
-    setError(null);
-    setConversionLogs([]);
-    setConversionProgress(0);
-  };
+  useEffect(() => {
+    if (conversionTimeoutRef.current) {
+      clearTimeout(conversionTimeoutRef.current);
+    }
+    conversionTimeoutRef.current = setTimeout(() => {
+      handleConvert();
+    }, 600);
+
+    return () => {
+      if (conversionTimeoutRef.current) {
+        clearTimeout(conversionTimeoutRef.current);
+      }
+    };
+  }, [pythonCode, handleConvert]);
 
   const handleSaveConversion = async () => {
     try {
@@ -250,35 +272,44 @@ export function CUDALiveConverter() {
         </MenubarMenu>
       </Menubar>
 
-      <div className="flex-grow flex">
-        <div className="w-1/2 border-r border-gray-200 dark:border-gray-800 p-6 flex flex-col">
-          <div className="text-lg font-medium mb-4">Python Code <Badge>Python 3.11</Badge></div>
-          <Editor
-            height="100%"
-            defaultLanguage="python"
-            value={pythonCode}
-            onChange={(value) => setPythonCode(value || '')}
-            theme={theme}
-          />
-        </div>
-        <div className="w-1/2 p-6 flex flex-col">
-          <div className="text-lg font-medium mb-4">Triton Code <Badge>PyTorch 2.3</Badge></div>
-          <Editor
-            height="100%"
-            defaultLanguage="python"
-            value={tritonCode}
-            theme={theme}
-            options={{ readOnly: true }}
-          />
-        </div>
-      </div>
-      
-      <div className="p-4 border-t border-gray-200 dark:border-gray-800">
-        <div className="flex items-center space-x-4 mb-4">
+      <div className="flex-grow flex flex-col">
+        <PanelGroup direction="horizontal">
+          <Panel minSize={30}>
+            <div className="h-full p-6 flex flex-col">
+              <div className="text-lg font-medium mb-4">Python Code <Badge>Python 3.11</Badge></div>
+              <Editor
+                height="100%"
+                defaultLanguage="python"
+                value={pythonCode}
+                onChange={(value) => setPythonCode(value || '')}
+                theme={theme}
+              />
+            </div>
+          </Panel>
+          <PanelResizeHandle className="w-2 bg-border hover:bg-primary cursor-col-resize" />
+          <Panel minSize={30}>
+            <div className="h-full p-6 flex flex-col">
+              <div className="text-lg font-medium mb-4 flex items-center">
+                Triton Code <Badge className="ml-2">PyTorch 2.3</Badge>
+                {isConverting && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+              </div>
+              <Editor
+                height="100%"
+                defaultLanguage="python"
+                value={tritonCode}
+                theme={theme}
+                options={{ readOnly: true }}
+              />
+            </div>
+          </Panel>
+        </PanelGroup>
+
+        <div className="ml-6 border-t border-gray-200 dark:border-gray-800">
+        <div className="flex items-center space-x-4">
           <Button onClick={handleConvert} disabled={isConverting || !pythonCode}>
             {isConverting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="mr-2 h-2 w-4 animate-spin" />
                 Converting...
               </>
             ) : (
@@ -291,45 +322,33 @@ export function CUDALiveConverter() {
               <progress value={conversionProgress} max="100" className="w-full" />
             </div>
           )}
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
         </div>
-        
-        <div className="flex items-center space-x-4 mb-4 hidden">
-          <input
-            type="text"
-            value={accessToken || ''}
-            onChange={(e) => setAccessToken(e.target.value)}
-            placeholder="GitHub Access Token"
-            className="flex-grow p-2 border rounded"
-          />
-          <input
-            type="text"
-            value={gistId || ''}
-            onChange={(e) => setGistId(e.target.value)}
-            placeholder="Gist ID"
-            className="flex-grow p-2 border rounded"
-          />
-          <Button onClick={handleSaveGist}>
-            <Github className="mr-2 h-4 w-4" />
-            Save to Gist
-          </Button>
-          <Button onClick={handleLoadGist}>
-            <Github className="mr-2 h-4 w-4" />
-            Load from Gist
-          </Button>
         </div>
-        
-        <ScrollArea className="h-[200px] border rounded p-2 mt-4">
-          {conversionLogs.map((log, index) => renderLogMessage(index, log))}
-          <div ref={logEndRef} />
-        </ScrollArea>
+        <Collapsible.Root open={isLogsOpen} onOpenChange={setIsLogsOpen}>
+          <Collapsible.Trigger asChild>
+            <Button variant="ghost" className="w-full flex justify-between items-center p-2">
+              Logs
+              {isLogsOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </Button>
+          </Collapsible.Trigger>
+          <Collapsible.Content>
+            <div className="p-2 border-t border-gray-200 dark:border-gray-800">
+              <ScrollArea className="h-[160px] border rounded p-2 mt-2">
+                {conversionLogs.map((log, index) => renderLogMessage(index, log))}
+                <div ref={logEndRef} />
+              </ScrollArea>
 
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+            </div>
+          </Collapsible.Content>
+        </Collapsible.Root>
       </div>
+      
     </div>
   );
 }
